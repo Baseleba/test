@@ -1,29 +1,33 @@
 #!/bin/bash
 
+# Prompt user for tag key to filter
+read -p "Enter the tag key to filter: " TAG_KEY
+
 # Get a list of all S3 buckets
 BUCKETS=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
 
-# Check if any buckets exist
-if [[ -z "$BUCKETS" ]]; then
-    echo "No S3 buckets found in this AWS account."
-    exit 1
-fi
+# Initialize a flag to check if any bucket matches
+FOUND=false
 
-echo -e "\nFetching tags for all S3 buckets...\n"
+echo -e "\nChecking S3 buckets for tag key: $TAG_KEY...\n"
 
-# Loop through each bucket and get its tags
+# Loop through each bucket and check its tags
 for BUCKET in $BUCKETS; do
-    echo "Bucket: $BUCKET"
-    
-    # Fetch tags for the bucket
     TAGS=$(aws s3api get-bucket-tagging --bucket "$BUCKET" --output json 2>/dev/null)
 
-    # Check if the bucket has tags
     if [[ $? -eq 0 && -n "$TAGS" ]]; then
-        echo "$TAGS" | jq -r '.TagSet[] | "- \(.Key): \(.Value)"'
-    else
-        echo "  No tags found."
-    fi
+        MATCH=$(echo "$TAGS" | jq -r ".TagSet[] | select(.Key == \"$TAG_KEY\")")
 
-    echo "----------------------------"
+        if [[ -n "$MATCH" ]]; then
+            echo "Bucket: $BUCKET"
+            echo "$TAGS" | jq -r '.TagSet[] | "- \(.Key): \(.Value)"'
+            echo "----------------------------"
+            FOUND=true
+        fi
+    fi
 done
+
+# If no matching buckets are found
+if [ "$FOUND" = false ]; then
+    echo "No S3 buckets found with the specified tag key."
+fi
