@@ -1,5 +1,48 @@
 # Nifi Installation
 
+# CONFIGURATION
+KEYSTORE_PASSWD="ecef4f07452e4181df757926157dc54fda7883aa"
+TRUSTSTORE_PASSWD="77d9f442049bf7727b864f957b7b064ffef2d5a6"
+
+CLUSTER_MODE=false
+
+# LDAP CONFIGURATION (TODO: USE LDAPS)
+LDAP_MODE="SIMPLE"
+LDAP_URIS="ldap://aiqawsdc-mmdo690.aiq.local ldap://aiqawsdc-8vt2tcq.aiq.local"
+LDAP_BIND_DN="CN=NiFi Prod,OU=Service Accounts,DC=aiq,DC=local"
+LDAP_BIND_PASSWD="52bd6c41-d785-4266-bb82-ba1b9130d164"
+LDAP_BASE_DN="DC=aiq,DC=local"
+LDAP_FILTER="sAMAccountName={0}"
+# note: can't use LDAPS yet as the DC's CA is not in the truststore
+
+# POST-LAUNCH Authorization Configuration
+# Once nifi is online, you will need to manually grant access to the main process group to the predefined users. Right-click the main canvas and "Manage access policies".
+# view the component: Viewers, Editors, Operators, and Admins
+# modify the component: Editors and Admins
+# operate the component: Operators, Editors and Admins
+# view provenance: Viewers, Editors, Operators and Admins
+# view the data: Editors, Operators, and Admins
+# modify the data: Editors, Admins
+# view the policies: Viewers, Editors, Operators, and Admins
+# modify the policies: Admins
+
+# special note:
+#  LDAP is configured for AUTHENTICATION, but not AUTHORIZATION
+#  The Administrator user is created as super-user. You will need to add
+#  any users you want to have access manually. This was supposedly enhanced
+#  with nifi 1.4, but I could not figure out the ldap authorizer.
+
+if [[ -z "$KEYSTORE_PASSWD" ]]; then
+  read -e -s -p "Enter keystore password: " KEYSTORE_PASSWD
+  echo
+fi
+
+if [[ -z "$TRUSTSTORE_PASSWD" ]]; then
+  read -e -s -p "Enter truststore password: " TRUSTSTORE_PASSWD
+  echo
+fi
+
+
 # pre-requisites
 apt-get update -y ; apt-get upgrade -y
 apt-get install -y openjdk-11-jdk-headless openjdk-11-jre-headless
