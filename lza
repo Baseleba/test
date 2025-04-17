@@ -1,0 +1,411 @@
+{
+    "plans": {
+      "Prod_Hourly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 * ? * * *)"
+            },
+            "lifecycle": {
+              "delete_after_days": {
+                "@@assign": "7"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            },
+            "copy_actions": {
+              "arn:aws-us-gov:backup:us-gov-west-1:038087354979:backup-vault:BackupVault": {
+                "target_backup_vault_arn": {
+                  "@@assign": "arn:aws-us-gov:backup:us-gov-west-1:038087354979:backup-vault:BackupVault"
+                },
+                "lifecycle": {
+                  "delete_after_days": {
+                    "@@assign": "7"
+                  }
+                }
+              }
+            },
+            "enable_continuous_backup": {
+              "@@assign": true
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "prod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Prod_Daily_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 ? * * *)"
+            },
+            "lifecycle": {
+              "delete_after_days": {
+                "@@assign": "32"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            },
+            "enable_continuous_backup": {
+              "@@assign": true
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "prod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "NonProd_Daily_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 ? * * *)"
+            },
+            "lifecycle": {
+              "delete_after_days": {
+                "@@assign": "14"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            },
+            "enable_continuous_backup": {
+              "@@assign": true
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "nonprod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Prod_Weekly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 ? * 7 *)"
+            },
+            "lifecycle": {
+              "delete_after_days": {
+                "@@assign": "98"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "prod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "NonProd_Weekly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 ? * 7 *)"
+            },
+            "lifecycle": {
+              "delete_after_days": {
+                "@@assign": "42"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "nonprod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Prod_Monthly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 1 * ? *)"
+            },
+            "lifecycle": {
+              "move_to_cold_storage_after_days": {
+                "@@assign": "90"
+              },
+              "delete_after_days": {
+                "@@assign": "396"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "prod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "NonProd_Monthly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 1 * ? *)"
+            },
+            "lifecycle": {
+              "move_to_cold_storage_after_days": {
+                "@@assign": "90"
+              },
+              "delete_after_days": {
+                "@@assign": "365"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "nonprod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Prod_Yearly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 5 1 1 ? *)"
+            },
+            "lifecycle": {
+              "move_to_cold_storage_after_days": {
+                "@@assign": "90"
+              },
+              "delete_after_days": {
+                "@@assign": "365"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            }
+          }
+        },
+        "selections": {
+          "tags": {
+            "Backup_Assignment": {
+              "iam_role_arn": {
+                "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+              },
+              "tag_key": {
+                "@@assign": "cst_backup_policy"
+              },
+              "tag_value": {
+                "@@assign": [
+                  "prod"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "RDS_Prod_Hourly_Plan": {
+        "regions": {
+          "@@append": [
+            "us-gov-east-1"
+          ]
+        },
+        "rules": {
+          "Backup_Rule": {
+            "schedule_expression": {
+              "@@assign": "cron(0 * ? * * *)"
+            },
+            "lifecycle": {
+              "delete_after_days": {
+                "@@assign": "7"
+              }
+            },
+            "target_backup_vault_name": {
+              "@@assign": "BackupVault"
+            },
+            "copy_actions": {
+              "arn:aws-us-gov:backup:us-gov-west-1:$account:backup-vault:BackupVault": {
+                "target_backup_vault_arn": {
+                  "@@assign": "arn:aws-us-gov:backup:us-gov-west-1:$account:backup-vault:BackupVault"
+                },
+                "lifecycle": {
+                  "delete_after_days": {
+                    "@@assign": "7"
+                  }
+                }
+              }
+            },
+            "enable_continuous_backup": {
+              "@@assign": true
+            }
+          }
+        },
+        "selections": {
+          "resources": {
+              "all_resources": {
+                  "iam_role_arn": {
+                      "@@assign": "arn:aws-us-gov:iam::$account:role/Backup-Role"
+                  },
+                  "resource_types": {
+                      "@@assign": [
+                          "arn:aws:rds:*:*:db:*"
+                      ]
+                  },
+                  "conditions": {
+                      "string_equals": {
+                        "Ebs_taged":{
+                          "condition_key": {
+                              "@@assign": "aws:ResourceTag/cst_backup_policy"
+                          },
+                          "condition_value": {
+                              "@@assign": [
+                                  "prod"
+                              ]
+                          }
+                      }
+                    }
+                  }
+              }
+          }
+        }
+      }   
+    }
+}
