@@ -1,0 +1,55 @@
+Failed resources:
+AWSAccelerator-OrganizationsStack-033839605363-us-gov-east-1 | 7:03:59 PM | UPDATE_FAILED        | Custom::CreatePolicy                                | CloudServices-CentralBackupPolicy-east/Resource/Default (CloudServicesCentralBackupPolicyeast5A649F19) Received response status [FAILED] from custom resource. Message returned: MalformedPolicyDocumentException: The provided policy document does not meet the requirements of the specified policy type.
+    at de_MalformedPolicyDocumentExceptionRes (/var/task/index.js:84:77862)
+    at de_CommandError (/var/task/index.js:84:70815)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /var/task/index.js:2:11453
+    at async /var/task/index.js:3:6669
+    at async /var/task/index.js:13:16454
+    at async /var/task/index.js:1:7578 (RequestId: 896221fc-c9dd-43a9-acd1-376f5c0bc2e4)
+    new CustomResource (/codebuild/output/src1285/src/s3/00/source/node_modules/aws-cdk-lib/core/lib/custom-resource.js:1:1075)
+    \_ new Policy (/codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/constructs/lib/aws-organizations/policy.ts:179:22)
+    \_ OrganizationsStack.addBackupPolicies (/codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/accelerator/lib/stacks/organizations-stack.ts:283:24)
+    \_ new OrganizationsStack (/codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/accelerator/lib/stacks/organizations-stack.ts:127:12)
+    \_ createOrganizationsStack (/codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/accelerator/utils/stack-utils.ts:548:31)
+    \_ createSingleAccountMultiRegionStacks (/codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/accelerator/bin/app.ts:132:29)
+    \_ main (/codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/accelerator/bin/app.ts:249:5)
+    \_ processTicksAndRejections (node:internal/process/task_queues:95:5)
+    \_ async /codebuild/output/src1285/src/s3/00/source/packages/@aws-accelerator/accelerator/bin/app.ts:260:5
+
+❌  AWSAccelerator-OrganizationsStack-033839605363-us-gov-east-1 failed: Error: The stack named AWSAccelerator-OrganizationsStack-033839605363-us-gov-east-1 failed to deploy: UPDATE_ROLLBACK_COMPLETE: Received response status [FAILED] from custom resource. Message returned: MalformedPolicyDocumentException: The provided policy document does not meet the requirements of the specified policy type.
+    at de_MalformedPolicyDocumentExceptionRes (/var/task/index.js:84:77862)
+    at de_CommandError (/var/task/index.js:84:70815)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /var/task/index.js:2:11453
+    at async /var/task/index.js:3:6669
+    at async /var/task/index.js:13:16454
+    at async /var/task/index.js:1:7578 (RequestId: 896221fc-c9dd-43a9-acd1-376f5c0bc2e4)
+    at FullCloudFormationDeployment.monitorDeployment (/codebuild/output/src4165/src/s3/00/source/node_modules/aws-cdk/lib/api/deploy-stack.ts:523:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Object.deployStack (/codebuild/output/src4165/src/s3/00/source/node_modules/aws-cdk/lib/cdk-toolkit.ts:332:24)
+    at async /codebuild/output/src4165/src/s3/00/source/node_modules/aws-cdk/lib/util/work-graph.ts:105:11
+
+❌ Deployment failed: Error: The stack named AWSAccelerator-OrganizationsStack-033839605363-us-gov-east-1 failed to deploy: UPDATE_ROLLBACK_COMPLETE: Received response status [FAILED] from custom resource. Message returned: MalformedPolicyDocumentException: The provided policy document does not meet the requirements of the specified policy type.
+    at de_MalformedPolicyDocumentExceptionRes (/var/task/index.js:84:77862)
+    at de_CommandError (/var/task/index.js:84:70815)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /var/task/index.js:2:11453
+    at async /var/task/index.js:3:6669
+    at async /var/task/index.js:13:16454
+    at async /var/task/index.js:1:7578 (RequestId: 896221fc-c9dd-43a9-acd1-376f5c0bc2e4)
+    at FullCloudFormationDeployment.monitorDeployment (/codebuild/output/src4165/src/s3/00/source/node_modules/aws-cdk/lib/api/deploy-stack.ts:523:13)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Object.deployStack (/codebuild/output/src4165/src/s3/00/source/node_modules/aws-cdk/lib/cdk-toolkit.ts:332:24)
+    at async /codebuild/output/src4165/src/s3/00/source/node_modules/aws-cdk/lib/util/work-graph.ts:105:11
+2025-04-16 19:04:08.794 | error | toolkit | The stack named AWSAccelerator-OrganizationsStack-033839605363-us-gov-east-1 failed to deploy: UPDATE_ROLLBACK_COMPLETE: Received response status [FAILED] from custom resource. Message returned: MalformedPolicyDocumentException: The provided policy document does not meet the requirements of the specified policy type.
+    at de_MalformedPolicyDocumentExceptionRes (/var/task/index.js:84:77862)
+    at de_CommandError (/var/task/index.js:84:70815)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /var/task/index.js:2:11453
+    at async /var/task/index.js:3:6669
+    at async /var/task/index.js:13:16454
+    at async /var/task/index.js:1:7578 (RequestId: 896221fc-c9dd-43a9-acd1-376f5c0bc2e4)
+Deployment failed
+error Command failed with exit code 1.
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
