@@ -1,7 +1,7 @@
 #!/bin/bash
 
 INPUT_FLOW="flow - Formatted.json"
-PARAM_CONTEXTS="partameter_context2.json"
+PARAM_CONTEXTS="parameter_context2.json"
 OUTPUT_FLOW="flow_with_contexts.json"
 
 echo "[*] STEP 1: Generate parameter contexts..."
@@ -33,3 +33,7 @@ jq '
 echo "[*] STEP 2: Attach parameter contexts..."
 
 jq -f attach_contexts.jq "$INPUT_FLOW" > "$OUTPUT_FLOW"
+
+echo "[✔] Done!"
+echo " - $PARAM_CONTEXTS"
+echo " - $OUTPUT_FLOW"
