@@ -1,39 +1,28 @@
-#!/bin/bash
+import json
 
-INPUT_FLOW="flow - Formatted.json"
-PARAM_CONTEXTS="parameter_context2.json"
-OUTPUT_FLOW="flow_with_contexts.json"
+INPUT_FILE = "flow - Formatted.json"
+OUTPUT_FILE = "flow_with_contexts.json"
 
-echo "[*] STEP 1: Generate parameter contexts..."
+def attach_contexts(pg):
+    if "variables" in pg and pg["variables"]:
+        if "parameterContext" in pg:
+            pg["parameterContext_auto"] = { "name": pg["name"] }
+        else:
+            pg["parameterContext"] = { "name": pg["name"] }
 
-jq '
-    def find_pg(pg):
-        if (pg.variables // {} | length > 0) then
-            [{
-                name: pg.name,
-                parameters: (
-                    pg.variables | to_entries | map({
-                        parameter: {
-                            name: .key,
-                            value: .value,
-                            description: "",
-                            sensitive: false
-                        }
-                    })
-                )
-            }] +
-            (pg.processGroups // [] | map(find_pg(.)) | add)
-        else
-            (pg.processGroups // [] | map(find_pg(.)) | add)
-        end;
+    for child in pg.get("processGroups", []):
+        attach_contexts(child)
 
-    find_pg(.rootGroup)
-' "$INPUT_FLOW" > "$PARAM_CONTEXTS"
+with open(INPUT_FILE, "r") as f:
+    flow = json.load(f)
 
-echo "[*] STEP 2: Attach parameter contexts..."
+# Recursively process .rootGroup
+if "rootGroup" in flow:
+    attach_contexts(flow["rootGroup"])
+else:
+    raise KeyError("Could not find 'rootGroup' in the JSON structure")
 
-jq -f attach_contexts.jq "$INPUT_FLOW" > "$OUTPUT_FLOW"
+with open(OUTPUT_FILE, "w") as f:
+    json.dump(flow, f, indent=2)
 
-echo "[✔] Done!"
-echo " - $PARAM_CONTEXTS"
-echo " - $OUTPUT_FLOW"
+print(f"[✔] Contexts added. Output written to {OUTPUT_FILE}")
