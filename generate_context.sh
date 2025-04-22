@@ -32,20 +32,4 @@ jq '
 
 echo "[*] STEP 2: Attach parameter contexts..."
 
-jq '
-    def attach_context(pg):
-        if (pg.variables // {} | length > 0) then
-            if pg.parameterContext? then
-                pg + { parameterContext_auto: { name: pg.name } }
-            else
-                pg + { parameterContext: { name: pg.name } }
-            end
-        else
-            pg
-        end;
-        pg + {
-            processGroups: (pg.processGroups // [] | map(attach_context))
-        };
-
-    .rootGroup |= attach_context(.)
-' "$INPUT_FLOW" > "$OUTPUT_FLOW"
+jq -f attach_contexts.jq "$INPUT_FLOW" > "$OUTPUT_FLOW"
