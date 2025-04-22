@@ -5,10 +5,10 @@ OUTPUT_FILE = "flow_with_contexts.json"
 
 def attach_contexts(pg):
     if "variables" in pg and pg["variables"]:
-        if "parameterContext" in pg:
-            pg["parameterContext_auto"] = { "name": pg["name"] }
+        if "parameterContextName" in pg:
+            pg["parameterContextName_auto"] = pg["name"]
         else:
-            pg["parameterContext"] = { "name": pg["name"] }
+            pg["parameterContextName"] = pg["name"]
 
     for child in pg.get("processGroups", []):
         attach_contexts(child)
@@ -16,7 +16,7 @@ def attach_contexts(pg):
 with open(INPUT_FILE, "r") as f:
     flow = json.load(f)
 
-# Recursively process .rootGroup
+# Start from rootGroup
 if "rootGroup" in flow:
     attach_contexts(flow["rootGroup"])
 else:
@@ -25,4 +25,4 @@ else:
 with open(OUTPUT_FILE, "w") as f:
     json.dump(flow, f, indent=2)
 
-print(f"[✔] Contexts added. Output written to {OUTPUT_FILE}")
+print(f"[✔] Contexts added using 'parameterContextName'. Output saved to {OUTPUT_FILE}")
