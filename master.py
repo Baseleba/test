@@ -62,9 +62,6 @@ def traverse_and_create_parameter_context(group):
         else:
             group["parameterContextName"] = pc_name
 
-        # Link PG to its parameter context
-        group["parameterContextName"] = pc_name
-
     # Recurse into nested PGs
     for child in group.get("processGroups", []):
         traverse_and_create_parameter_context(child)
