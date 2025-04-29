@@ -8,22 +8,18 @@ def count_pg_with_variables(flow_file_path):
     pg_with_variables = []
 
     def traverse_process_group(group):
-        print(f"Checking ProcessGroup: {group.get('name', 'Unnamed')} (ID: {group['id']})")
-
-        # Print variables raw content
+        print(f"Checking ProcessGroup: {group.get('name', 'Unnamed')} (ID: {group.get('identifier', 'no-id')})")
         vars_block = group.get("variables")
         print(f"  Raw variables block: {vars_block}")
 
-        if vars_block:
-            if isinstance(vars_block, dict) and len(vars_block) > 0:
-                pg_with_variables.append((group['id'], group.get('name', 'Unnamed')))
-                print(f"  --> PG has variables!")
+        if vars_block and isinstance(vars_block, dict) and len(vars_block) > 0:
+            pg_with_variables.append((group.get('identifier', 'no-id'), group.get('name', 'Unnamed')))
+            print("  --> PG has variables!")
 
-        # Recursively scan child processGroups
+        # Recursively check child process groups
         for child_group in group.get("processGroups", []):
             traverse_process_group(child_group)
 
-    # Locate the root process group
     root_group = flow_data.get("rootGroup")
     if not root_group:
         print("No 'rootGroup' found in the flow file.")
@@ -38,7 +34,7 @@ def count_pg_with_variables(flow_file_path):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python count_pg_with_variables.py <flow.json>")
+        print("Usage: python pg_counter.py <flow.json>")
         sys.exit(1)
 
     input_path = sys.argv[1]
