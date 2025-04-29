@@ -7,14 +7,24 @@ def count_pg_with_variables(flow_file_path):
 
     pg_with_variables = []
 
+    def has_variables(pg):
+        vars_block = pg.get('variables')
+        if vars_block and isinstance(vars_block, dict):
+            variables_list = vars_block.get('variables', [])
+            if isinstance(variables_list, list) and len(variables_list) > 0:
+                return True
+        return False
+
     def scan_pg(pg):
-        if 'variables' in pg and pg['variables'] and pg['variables'].get('variables'):
+        # Check if this PG has variables
+        if has_variables(pg):
             pg_with_variables.append((pg['id'], pg.get('name', 'Unnamed')))
 
+        # Now recursively check child processGroups
         for child_pg in pg.get('processGroups', []):
             scan_pg(child_pg)
 
-    # Start scanning from rootGroup
+    # Get rootGroup
     root_group = flow.get('rootGroup')
     if not root_group:
         print("No 'rootGroup' found in the flow file.")
