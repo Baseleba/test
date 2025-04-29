@@ -56,6 +56,12 @@ def traverse_and_create_parameter_context(group):
 
         parameter_contexts.append(parameter_context)
 
+        # Handle PGs with existing parameterContextName
+        if "parameterContextName" in group:
+            group["parameterContextName_auto"] = pc_name
+        else:
+            group["parameterContextName"] = pc_name
+
         # Link PG to its parameter context
         group["parameterContextName"] = pc_name
 
