@@ -1,9 +1,10 @@
 import json
 import sys
+import uuid
 
 # Check and get input file path from command-line arguments
 if len(sys.argv) != 2:
-    print("Usage: python convert_nifi_params_single_context.py <nifi_1.17_flow.json>")
+    print("Usage: python migrate_variables_into_flow.py <nifi_1.17_flow.json>")
     sys.exit(1)
 
 input_path = sys.argv[1]
@@ -39,18 +40,21 @@ def traverse_process_group(group):
 # Start recursion from the root process group
 traverse_process_group(root_group)
 
-# Build a single Parameter Context
+# Build a single Parameter Context with UUIDs
 parameter_context = {
-    "name": "MigratedVariables",   # <-- Name your context here
+    "identifier": str(uuid.uuid4()),
+    "instanceIdentifier": str(uuid.uuid4()),
+    "name": "MigratedVariables",  # Change this name if you want
     "parameters": all_parameters
 }
 
-# Prepare output
-output_data = {"parameterContexts": [parameter_context]}
+# Inject into the flow
+flow_data["parameterContexts"] = [parameter_context]
 
-# Write to parameter_contexts.json
-with open("parameter_contexts.json", 'w') as out_file:
-    json.dump(output_data, out_file, indent=4)
-    out_file.write("\n")
+# Save the new flow with parameter contexts
+output_file = "flow_with_parameter_context.json"
+with open(output_file, 'w') as f:
+    json.dump(flow_data, f, indent=2)
+    f.write("\n")
 
-print("[✔] All variables combined into one Parameter Context and saved to 'parameter_contexts.json'")
+print(f"[✔] All variables combined and injected into flow under 'parameterContexts'. Saved to '{output_file}'")
