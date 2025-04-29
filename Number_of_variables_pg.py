@@ -5,29 +5,28 @@ def count_pg_with_variables(flow_file_path):
     with open(flow_file_path, 'r', encoding='utf-8') as f:
         flow = json.load(f)
 
-    # To store how many PGs have variables
     pg_with_variables = []
 
-    # Recursive function to walk through the flow structure
     def scan_pg(pg):
-        if 'variables' in pg and pg['variables']:
-            pg_with_variables.append(pg['id'])
+        if 'variables' in pg and pg['variables'] and pg['variables'].get('variables'):
+            pg_with_variables.append((pg['id'], pg.get('name', 'Unnamed')))
 
-        if 'processGroups' in pg:
-            for child_pg in pg['processGroups']:
-                scan_pg(child_pg)
+        for child_pg in pg.get('processGroups', []):
+            scan_pg(child_pg)
 
-    # Start scanning from the root
-    if 'flowContents' in flow['processGroupFlow']:
-        scan_pg(flow['processGroupFlow']['flowContents'])
-    else:
-        print("No 'flowContents' found in the flow file structure.")
+    # Start scanning from rootGroup
+    root_group = flow.get('rootGroup')
+    if not root_group:
+        print("No 'rootGroup' found in the flow file.")
         return
 
+    # Scan rootGroup itself
+    scan_pg(root_group)
+
     print(f"Total number of Process Groups with variables: {len(pg_with_variables)}")
-    print("List of Process Group IDs with variables:")
-    for pg_id in pg_with_variables:
-        print(f"  - {pg_id}")
+    print("List of Process Groups with variables:")
+    for pg_id, pg_name in pg_with_variables:
+        print(f"  - ID: {pg_id}, Name: {pg_name}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
