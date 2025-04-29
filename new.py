@@ -1,7 +1,6 @@
 import json
 import sys
 import uuid
-import re
 
 # ----------------------------- Settings -----------------------------
 parameter_context_name = "MigratedVariables"  # Name of the new Parameter Context
@@ -9,16 +8,8 @@ output_file = "flow_with_parameter_context.json"  # Name of the output file
 
 # --------------------------- Helper Functions ------------------------
 
-def update_properties_in_place(properties):
-    """Update processor properties: replace ${...} with #{...}."""
-    if not properties:
-        return
-    for key, value in properties.items():
-        if isinstance(value, str) and "${" in value:
-            properties[key] = re.sub(r'\$\{([^}]+)\}', r'#\{\1\}', value)
-
 def traverse_process_group(group):
-    """Recursively traverse process groups, collect variables, attach parameter context, update processor properties."""
+    """Recursively traverse process groups, collect variables, and attach parameter context name."""
     vars_dict = group.get("variables", {})
     if vars_dict:
         # Collect variables
@@ -34,17 +25,6 @@ def traverse_process_group(group):
             group["parameterContextName_auto"] = parameter_context_name
         else:
             group["parameterContextName"] = parameter_context_name
-
-    # Update processor properties
-    for processor in group.get("processors", []):
-        config = processor.get("config", {})
-        properties = config.get("properties", {})
-        update_properties_in_place(properties)
-
-    # (Optional) Also update controller services if needed (not done yet)
-    # for controller_service in group.get("controllerServices", []):
-    #     config = controller_service.get("properties", {})
-    #     update_properties_in_place(config)
 
     # Recursively process child groups
     for child_group in group.get("processGroups", []):
@@ -95,4 +75,4 @@ with open(output_file, 'w') as f:
     json.dump(flow_data, f, indent=2)
     f.write("\n")
 
-print(f"[✔] Migration complete. Output saved to '{output_file}'")
+print(f"[✔] Migration complete (without property changes). Output saved to '{output_file}'")
