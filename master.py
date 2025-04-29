@@ -65,17 +65,26 @@ def traverse_and_create_parameter_context(group):
 
 # --------------------------- Execute ------------------------
 
+print("[*] Starting traversal of process groups...")
+
 traverse_and_create_parameter_context(root_group)
+
+print(f"[*] Finished traversal. Found {len(parameter_contexts)} parameter contexts.")
 
 # Add parameter contexts to flow file
 if "parameterContexts" in flow_data and isinstance(flow_data["parameterContexts"], list):
+    print("[*] Appending to existing parameterContexts array.")
     flow_data["parameterContexts"].extend(parameter_contexts)
 else:
+    print("[*] Creating new parameterContexts array.")
     flow_data["parameterContexts"] = parameter_contexts
 
 # Save result
-with open(output_file, 'w') as f:
-    json.dump(flow_data, f, indent=2)
-    f.write("\n")
+try:
+    with open(output_file, 'w') as f:
+        json.dump(flow_data, f, indent=2)
+        f.write("\n")
+    print(f"[✔] Migration complete. Created {len(parameter_contexts)} Parameter Context(s). Output saved to '{output_file}'")
+except Exception as e:
+    print(f"[❌] Failed to write output file: {e}")
 
-print(f"[✔] Migration complete. Created {len(parameter_contexts)} Parameter Context(s). Output saved to '{output_file}'")
