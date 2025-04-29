@@ -1,6 +1,7 @@
 import json
 import sys
 import uuid
+import re
 
 # Check and get input file path from command-line arguments
 if len(sys.argv) != 2:
@@ -22,8 +23,16 @@ else:
 all_parameters = []  # single list to collect all parameters
 parameter_context_name = "MigratedVariables"  # Name of the new context we create
 
+def update_properties(properties):
+    """Update properties dictionary: replace ${...} with #{...}."""
+    if not properties:
+        return
+    for key, value in properties.items():
+        if isinstance(value, str) and "${" in value:
+            properties[key] = re.sub(r'\$\{([^}]+)\}', r'#\{\1\}', value)
+
 def traverse_process_group(group):
-    """Recursively traverse process groups, collect variables, and attach parameter context name."""
+    """Recursively traverse process groups, collect variables, attach parameter context, update properties."""
     vars_dict = group.get("variables", {})
     if vars_dict:
         # Add variables to global list
@@ -39,7 +48,11 @@ def traverse_process_group(group):
             group["parameterContextName_auto"] = parameter_context_name
         else:
             group["parameterContextName"] = parameter_context_name
-    
+
+    # Update all processors' properties
+    for processor in group.get("processors", []):
+        update_properties(processor.get("config", {}).get("properties", {}))
+
     # Recurse into child process groups if any
     for child_group in group.get("processGroups", []):
         traverse_process_group(child_group)
@@ -69,4 +82,4 @@ with open(output_file, 'w') as f:
     json.dump(flow_data, f, indent=2)
     f.write("\n")
 
-print(f"[✔] Migrated variables added and Process Groups updated. Saved to '{output_file}'")
+print(f"[✔] Migrated variables into Parameters, updated Process Groups, and fixed properties. Saved to '{output_file}'")
