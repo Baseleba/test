@@ -8,10 +8,16 @@ def count_pg_with_variables(flow_file_path):
     pg_with_variables = []
 
     def traverse_process_group(group):
-        vars_dict = group.get("variables", {})
-        if vars_dict:
-            if isinstance(vars_dict, dict) and len(vars_dict) > 0:
+        print(f"Checking ProcessGroup: {group.get('name', 'Unnamed')} (ID: {group['id']})")
+
+        # Print variables raw content
+        vars_block = group.get("variables")
+        print(f"  Raw variables block: {vars_block}")
+
+        if vars_block:
+            if isinstance(vars_block, dict) and len(vars_block) > 0:
                 pg_with_variables.append((group['id'], group.get('name', 'Unnamed')))
+                print(f"  --> PG has variables!")
 
         # Recursively scan child processGroups
         for child_group in group.get("processGroups", []):
@@ -23,10 +29,9 @@ def count_pg_with_variables(flow_file_path):
         print("No 'rootGroup' found in the flow file.")
         return
 
-    # Start traversing
     traverse_process_group(root_group)
 
-    print(f"Total number of Process Groups with variables: {len(pg_with_variables)}")
+    print(f"\nTotal number of Process Groups with variables: {len(pg_with_variables)}")
     print("List of Process Groups with variables:")
     for pg_id, pg_name in pg_with_variables:
         print(f"  - Name: {pg_name}, ID: {pg_id}")
