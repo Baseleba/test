@@ -3,33 +3,28 @@ import sys
 
 def count_pg_with_variables(flow_file_path):
     with open(flow_file_path, 'r', encoding='utf-8') as f:
-        flow = json.load(f)
+        flow_data = json.load(f)
 
     pg_with_variables = []
 
-    def has_variables(pg):
-        vars_block = pg.get('variables')
-        if vars_block and isinstance(vars_block, dict):
-            variables_list = vars_block.get('variables', [])
-            return isinstance(variables_list, list) and len(variables_list) > 0
-        return False
+    def traverse_process_group(group):
+        vars_dict = group.get("variables", {})
+        if vars_dict:
+            if isinstance(vars_dict, dict) and len(vars_dict) > 0:
+                pg_with_variables.append((group['id'], group.get('name', 'Unnamed')))
 
-    def scan_pgs(pg_list):
-        for pg in pg_list:
-            if has_variables(pg):
-                pg_with_variables.append((pg['id'], pg.get('name', 'Unnamed')))
-            # Recursively scan nested processGroups
-            if 'processGroups' in pg:
-                scan_pgs(pg['processGroups'])
+        # Recursively scan child processGroups
+        for child_group in group.get("processGroups", []):
+            traverse_process_group(child_group)
 
-    # Start directly at rootGroup -> processGroups
-    root_group = flow.get('rootGroup')
+    # Locate the root process group
+    root_group = flow_data.get("rootGroup")
     if not root_group:
         print("No 'rootGroup' found in the flow file.")
         return
 
-    top_level_pgs = root_group.get('processGroups', [])
-    scan_pgs(top_level_pgs)
+    # Start traversing
+    traverse_process_group(root_group)
 
     print(f"Total number of Process Groups with variables: {len(pg_with_variables)}")
     print("List of Process Groups with variables:")
