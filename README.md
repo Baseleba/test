@@ -20,11 +20,13 @@ else:
     raise KeyError("Could not find 'rootGroup' in the JSON structure.")
 
 all_parameters = []  # single list to collect all parameters
+parameter_context_name = "MigratedVariables"  # Name of the new context we create
 
 def traverse_process_group(group):
-    """Recursively traverse process groups and collect all variables into one parameter context."""
+    """Recursively traverse process groups, collect variables, and attach parameter context name."""
     vars_dict = group.get("variables", {})
     if vars_dict:
+        # Add variables to global list
         for var_name, var_value in vars_dict.items():
             all_parameters.append({
                 "name": var_name,
@@ -32,6 +34,11 @@ def traverse_process_group(group):
                 "sensitive": False,
                 "value": var_value
             })
+        # Attach parameterContextName or parameterContextName_auto
+        if "parameterContextName" in group:
+            group["parameterContextName_auto"] = parameter_context_name
+        else:
+            group["parameterContextName"] = parameter_context_name
     
     # Recurse into child process groups if any
     for child_group in group.get("processGroups", []):
@@ -40,24 +47,26 @@ def traverse_process_group(group):
 # Start recursion from the root process group
 traverse_process_group(root_group)
 
-# Build a single Parameter Context with UUIDs
+# Build the new single Parameter Context
 parameter_context = {
     "identifier": str(uuid.uuid4()),
     "instanceIdentifier": str(uuid.uuid4()),
-    "name": "MigratedVariables",  # Change this name if you want
-    "parameters": all_parameters
+    "name": parameter_context_name,
+    "parameters": all_parameters,
+    "inheritedParameterContexts": [],
+    "componentType": "PARAMETER_CONTEXT"
 }
 
-# Handle existing parameterContexts safely
+# Append the new parameter context
 if "parameterContexts" in flow_data and isinstance(flow_data["parameterContexts"], list):
     flow_data["parameterContexts"].append(parameter_context)
 else:
     flow_data["parameterContexts"] = [parameter_context]
 
-# Save the new flow with parameter contexts
+# Save the updated flow
 output_file = "flow_with_parameter_context.json"
 with open(output_file, 'w') as f:
     json.dump(flow_data, f, indent=2)
     f.write("\n")
 
-print(f"[✔] Migrated variables added as a new Parameter Context. Saved to '{output_file}'")
+print(f"[✔] Migrated variables added and Process Groups updated. Saved to '{output_file}'")
