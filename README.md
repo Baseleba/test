@@ -48,8 +48,11 @@ parameter_context = {
     "parameters": all_parameters
 }
 
-# Inject into the flow
-flow_data["parameterContexts"] = [parameter_context]
+# Handle existing parameterContexts safely
+if "parameterContexts" in flow_data and isinstance(flow_data["parameterContexts"], list):
+    flow_data["parameterContexts"].append(parameter_context)
+else:
+    flow_data["parameterContexts"] = [parameter_context]
 
 # Save the new flow with parameter contexts
 output_file = "flow_with_parameter_context.json"
@@ -57,4 +60,4 @@ with open(output_file, 'w') as f:
     json.dump(flow_data, f, indent=2)
     f.write("\n")
 
-print(f"[✔] All variables combined and injected into flow under 'parameterContexts'. Saved to '{output_file}'")
+print(f"[✔] Migrated variables added as a new Parameter Context. Saved to '{output_file}'")
