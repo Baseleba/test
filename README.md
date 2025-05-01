@@ -1,35 +1,3 @@
-SELECT key, version_id, last_modified_date, storage_class
-FROM s3_inventory_aiq_qdrive
-WHERE is_latest = false
-  AND storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL';
-
-
-
-CREATE EXTERNAL TABLE IF NOT EXISTS s3_inventory_aiq_qdrive (
-  bucket STRING,
-  key STRING,
-  version_id STRING,
-  is_latest BOOLEAN,
-  is_delete_marker BOOLEAN,
-  size BIGINT,
-  last_modified_date STRING,
-  storage_class STRING,
-  etag STRING,
-  encryption_status STRING,
-  object_lock_retain_until_date STRING,
-  object_lock_mode STRING,
-  object_lock_legal_hold_status STRING,
-  intelligent_tiering_access_tier STRING
-)
-ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
-WITH SERDEPROPERTIES (
-  'separatorChar' = ',',
-  'quoteChar' = '\"'
-)
-STORED AS TEXTFILE
-LOCATION 's3://aiq-logging/s3-inventories/aiq-qdrive-inventory/data/'
-TBLPROPERTIES ('skip.header.line.count'='1');
-
 
 
 
