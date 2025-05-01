@@ -1,3 +1,14 @@
+aws s3api select-object-content \
+  --bucket aiq-logging \
+  --key "s3-inventories/aiq-qdrive-inventory/data/5bec0881-bef4-4a59-8d57-f1ea3f4fcfc1.csv.gz" \
+  --expression "SELECT s._2, s._3, s._7, s._8 FROM S3Object s WHERE s._4 = 'false' AND s._8 = 'GLACIER'" \
+  --expression-type SQL \
+  --input-serialization '{"CSV": {"FileHeaderInfo": "NONE"}, "CompressionType": "GZIP"}' \
+  --output-serialization '{"CSV": {}}' \
+  output.csv
+
+
+
 DROP TABLE IF EXISTS s3_inventory_aiq_qdrive;
 
 CREATE EXTERNAL TABLE s3_inventory_aiq_qdrive (
