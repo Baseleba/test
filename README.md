@@ -1,4 +1,29 @@
+DROP TABLE IF EXISTS s3_inventory_aiq_qdrive;
 
+CREATE EXTERNAL TABLE s3_inventory_aiq_qdrive (
+  bucket STRING,
+  key STRING,
+  versionid STRING,
+  islatest BOOLEAN,
+  isdeletemarker BOOLEAN,
+  size BIGINT,
+  lastmodifieddate STRING,
+  storageclass STRING,
+  etag STRING,
+  encryptionstatus STRING,
+  objectlockretainuntildate STRING,
+  objectlockmode STRING,
+  objectlocklegalholdstatus STRING,
+  intelligenttieringaccesstier STRING
+)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'
+WITH SERDEPROPERTIES (
+  'serialization.format' = ',',
+  'field.delim' = ','
+)
+STORED AS TEXTFILE
+LOCATION 's3://aiq-logging/s3-inventories/aiq-qdrive-inventory/data/'
+TBLPROPERTIES ('skip.header.line.count'='1');
 
 
 
