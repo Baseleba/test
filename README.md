@@ -1,3 +1,10 @@
+SELECT key, version_id, last_modified_date, storage_class
+FROM s3_inventory_aiq_qdrive
+WHERE is_latest = false
+  AND storage_class = 'GLACIER_FLEXIBLE_RETRIEVAL';
+
+
+
 CREATE EXTERNAL TABLE IF NOT EXISTS s3_inventory_aiq_qdrive (
   bucket STRING,
   key STRING,
