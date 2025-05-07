@@ -1,41 +1,96 @@
 import json
 import sys
+import re
+from collections import defaultdict
 
-def count_pg_with_variables(flow_file_path):
-    with open(flow_file_path, 'r', encoding='utf-8') as f:
-        flow_data = json.load(f)
+# ----------------------------- Settings -----------------------------
+output_file = "flow_variables_converted.json"
+summary_file = "replaced_variables_summary.json"
 
-    pg_with_variables = []
+if len(sys.argv) != 2:
+    print("Usage: python replace_pg_scoped_variables.py <nifi_1.17_flow.json>")
+    sys.exit(1)
 
-    def traverse_process_group(group):
-        print(f"Checking ProcessGroup: {group.get('name', 'Unnamed')} (ID: {group.get('identifier', 'no-id')})")
-        vars_block = group.get("variables")
-        print(f"  Raw variables block: {vars_block}")
+input_path = sys.argv[1]
 
-        if vars_block and isinstance(vars_block, dict) and len(vars_block) > 0:
-            pg_with_variables.append((group.get('identifier', 'no-id'), group.get('name', 'Unnamed')))
-            print("  --> PG has variables!")
+with open(input_path, 'r') as f:
+    flow_data = json.load(f)
 
-        # Recursively check child process groups
-        for child_group in group.get("processGroups", []):
-            traverse_process_group(child_group)
+# --------------------------- Utility ------------------------
 
-    root_group = flow_data.get("rootGroup")
-    if not root_group:
-        print("No 'rootGroup' found in the flow file.")
+def replace_in_properties(props, variables, replaced_vars, pg_name):
+    if not isinstance(props, dict):
         return
+    for key, val in props.items():
+        if isinstance(val, str):
+            for var in variables:
+                new_val, count = re.subn(fr'\$\{{\s*' + re.escape(var) + r'\s*\}}', f'#{{{var}}}', val)
+                if count > 0:
+                    props[key] = new_val
+                    replaced_vars[pg_name].add(var)
 
-    traverse_process_group(root_group)
+def replace_in_pg_and_children(group, scoped_vars, replaced_vars, parent_pg_name):
+    # Replace in processors
+    for processor in group.get("processors", []):
+        replace_in_properties(
+            processor.get("config", {}).get("properties", {}),
+            scoped_vars,
+            replaced_vars,
+            parent_pg_name
+        )
 
-    print(f"\nTotal number of Process Groups with variables: {len(pg_with_variables)}")
-    print("List of Process Groups with variables:")
-    for pg_id, pg_name in pg_with_variables:
-        print(f"  - Name: {pg_name}, ID: {pg_id}")
+    # Replace in controller services
+    for service in group.get("controllerServices", []):
+        replace_in_properties(
+            service.get("properties", {}),
+            scoped_vars,
+            replaced_vars,
+            parent_pg_name
+        )
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python pg_counter.py <flow.json>")
-        sys.exit(1)
+    # Recurse into children
+    for child in group.get("processGroups", []):
+        replace_in_pg_and_children(child, scoped_vars, replaced_vars, parent_pg_name)
 
-    input_path = sys.argv[1]
-    count_pg_with_variables(input_path)
+# --------------------------- Core Logic ------------------------
+
+replaced_vars = defaultdict(set)
+
+def traverse_parent_groups(group):
+    pg_name = group.get("name", f"Unnamed_{group.get('identifier', '')[:6]}")
+    scoped_vars = set(group.get("variables", {}).keys())
+
+    if scoped_vars:
+        replace_in_pg_and_children(group, scoped_vars, replaced_vars, pg_name)
+
+    for child in group.get("processGroups", []):
+        traverse_parent_groups(child)
+
+# --------------------------- Execute ------------------------
+
+if "rootGroup" not in flow_data:
+    raise KeyError("Could not find 'rootGroup' in the JSON structure.")
+
+root_group = flow_data["rootGroup"]
+print("[*] Looking for variables defined in PGs and replacing within scope (PG + children)...")
+traverse_parent_groups(root_group)
+
+# --------------------------- Save Output Files ------------------------
+
+try:
+    with open(output_file, 'w') as f:
+        json.dump(flow_data, f, indent=2)
+        f.write("\n")
+    print(f"[✔] Updated flow saved to '{output_file}'")
+except Exception as e:
+    print(f"[❌] Failed to write updated flow file: {e}")
+
+# Write summary
+summary_dict = {pg: sorted(list(vars_set)) for pg, vars_set in replaced_vars.items() if vars_set}
+
+try:
+    with open(summary_file, 'w') as f:
+        json.dump(summary_dict, f, indent=2)
+    print(f"[✔] Replacement summary saved to '{summary_file}'")
+except Exception as e:
+    print(f"[❌] Failed to write summary file: {e}")
