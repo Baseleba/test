@@ -16,64 +16,67 @@ input_path = sys.argv[1]
 with open(input_path, 'r') as f:
     flow_data = json.load(f)
 
-# ----------------------------- Helpers -----------------------------
+# ----------------------------- Replacer -----------------------------
 
-def replace_in_props(props, var_names, replaced_vars, pg_name):
+replaced_vars = defaultdict(set)
+
+def replace_in_properties(props, variable_names, pg_name):
     if not isinstance(props, dict):
         return
-    for key, val in props.items():
-        if not isinstance(val, str):
-            continue
-        for var in var_names:
-            pattern = r'\$\{\s*' + re.escape(var) + r'\s*\}'
-            new_val, count = re.subn(pattern, f'#{{{var}}}', val)
-            if count > 0:
-                props[key] = new_val
-                replaced_vars[pg_name].add(var)
 
-def replace_in_pg_and_children(group, var_names, replaced_vars, parent_pg_name):
+    for key, val in props.items():
+        if isinstance(val, str):
+            for var in variable_names:
+                pattern = r'\$\{\s*' + re.escape(var) + r'\s*\}'
+                new_val, count = re.subn(pattern, f'#{{{var}}}', val)
+                if count > 0:
+                    props[key] = new_val
+                    replaced_vars[pg_name].add(var)
+
+def replace_variables_in_pg_and_children(group, variable_names, pg_name):
     # Replace in processors
     for processor in group.get("processors", []):
         config = processor.get("config", {})
-        replace_in_props(config.get("properties", {}), var_names, replaced_vars, parent_pg_name)
+        replace_in_properties(config.get("properties", {}), variable_names, pg_name)
 
     # Replace in controller services
     for service in group.get("controllerServices", []):
-        replace_in_props(service.get("properties", {}), var_names, replaced_vars, parent_pg_name)
+        replace_in_properties(service.get("properties", {}), variable_names, pg_name)
 
-    # Recurse into children
-    for child_pg in group.get("processGroups", []):
-        replace_in_pg_and_children(child_pg, var_names, replaced_vars, parent_pg_name)
+    # Recurse into child PGs
+    for child in group.get("processGroups", []):
+        replace_variables_in_pg_and_children(child, variable_names, pg_name)
 
-def process_pg(group, replaced_vars):
+# ----------------------------- Traverse -----------------------------
+
+def traverse_and_replace(group):
     pg_name = group.get("name", f"Unnamed_{group.get('identifier', '')[:6]}")
-    local_vars = list(group.get("variables", {}).keys())
+    vars_dict = group.get("variables", {})
 
-    if local_vars:
-        replace_in_pg_and_children(group, local_vars, replaced_vars, pg_name)
+    if vars_dict:
+        variable_names = list(vars_dict.keys())
+        replace_variables_in_pg_and_children(group, variable_names, pg_name)
 
     for child in group.get("processGroups", []):
-        process_pg(child, replaced_vars)
+        traverse_and_replace(child)
 
-# ----------------------------- Main -----------------------------
+# ----------------------------- Run -----------------------------
 
 if "rootGroup" not in flow_data:
     raise KeyError("Could not find 'rootGroup' in the JSON structure.")
 
-root = flow_data["rootGroup"]
-replaced_vars = defaultdict(set)
+root_group = flow_data["rootGroup"]
+print("[*] Replacing variable references in each PG and children...")
 
-print("[*] Starting variable replacement per PG and its children...")
-process_pg(root, replaced_vars)
+traverse_and_replace(root_group)
 
-# Save modified flow
+# Save the modified flow
 with open(output_file, 'w') as f:
     json.dump(flow_data, f, indent=2)
-    f.write("\n")
-print(f"[✔] Modified flow saved to '{output_file}'")
+print(f"[✔] Flow file saved to '{output_file}'")
 
 # Save replacement summary
-summary_dict = {pg: sorted(list(vars)) for pg, vars in replaced_vars.items() if vars}
+summary = {pg: sorted(vars) for pg, vars in replaced_vars.items()}
 with open(summary_file, 'w') as f:
-    json.dump(summary_dict, f, indent=2)
-print(f"[✔] Summary saved to '{summary_file}'")
+    json.dump(summary, f, indent=2)
+print(f"[✔] Replacement summary saved to '{summary_file}'")
