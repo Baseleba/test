@@ -50,17 +50,19 @@ def apply_replacement_in_pg_tree(group, var_names, source_pg_name):
 
 # -------------------- Traversal --------------------
 
-def traverse_all_groups(group):
+def traverse_pg(group, inherited_vars):
     pg_name = group.get("name", f"Unnamed_{group.get('identifier', '')[:6]}")
-    vars_dict = group.get("variables", {})
+    local_vars = set(group.get("variables", {}).keys())
+    available_vars = inherited_vars.union(local_vars)
 
-    if vars_dict:
-        var_names = list(vars_dict.keys())
-        print(f"[✔] PG '{pg_name}' declares variables: {var_names}")
-        apply_replacement_in_pg_tree(group, var_names, pg_name)
+    # Replace in processors
+    for processor in group.get("processors", []):
+        props = processor.get("properties", {})  # ✅ FIXED LINE
+        replace_in_properties(props, available_vars, pg_name)
 
+    # Recurse into nested PGs
     for child_pg in group.get("processGroups", []):
-        traverse_all_groups(child_pg)
+        traverse_pg(child_pg, available_vars)
 
 # -------------------- Execute --------------------
 
@@ -80,46 +82,3 @@ summary = {pg: sorted(list(vars)) for pg, vars in replaced_vars.items()}
 with open(summary_file, 'w') as f:
     json.dump(summary, f, indent=2)
 print(f"[✔] Replacement summary saved to '{summary_file}'")
-
-
-
-
-{
-                    "identifier": "4de4daf1-77a2-31a3-8151-e9bbea224e9f",
-                    "instanceIdentifier": "15fb718b-17f5-3c31-09ec-e34eb46508f9",
-                    "name": "UpdateFilename",
-                    "comments": "",
-                    "position": {
-                      "x": 16.0,
-                      "y": 752.0
-                    },
-                    "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
-                    "bundle": {
-                      "group": "org.apache.nifi",
-                      "artifact": "nifi-update-attribute-nar",
-                      "version": "1.17.0"
-                    },
-                    "properties": {
-                      "filename": "${s3.key}",
-                      "Store State": "Do not store state",
-                      "canonical-value-lookup-cache-size": "100"
-                    },
-                    "propertyDescriptors": {},
-                    "style": {},
-                    "schedulingPeriod": "0 sec",
-                    "schedulingStrategy": "TIMER_DRIVEN",
-                    "executionNode": "ALL",
-                    "penaltyDuration": "30 sec",
-                    "yieldDuration": "1 sec",
-                    "bulletinLevel": "WARN",
-                    "runDurationMillis": 0,
-                    "concurrentlySchedulableTaskCount": 1,
-                    "autoTerminatedRelationships": [],
-                    "scheduledState": "RUNNING",
-                    "retryCount": 10,
-                    "retriedRelationships": [],
-                    "backoffMechanism": "PENALIZE_FLOWFILE",
-                    "maxBackoffPeriod": "10 mins",
-                    "componentType": "PROCESSOR",
-                    "groupIdentifier": "4ea964dd-8582-3dab-b8c4-54eb1347e2bb"
-                  },
