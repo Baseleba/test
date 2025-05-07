@@ -80,3 +80,46 @@ summary = {pg: sorted(list(vars)) for pg, vars in replaced_vars.items()}
 with open(summary_file, 'w') as f:
     json.dump(summary, f, indent=2)
 print(f"[✔] Replacement summary saved to '{summary_file}'")
+
+
+
+
+{
+                    "identifier": "4de4daf1-77a2-31a3-8151-e9bbea224e9f",
+                    "instanceIdentifier": "15fb718b-17f5-3c31-09ec-e34eb46508f9",
+                    "name": "UpdateFilename",
+                    "comments": "",
+                    "position": {
+                      "x": 16.0,
+                      "y": 752.0
+                    },
+                    "type": "org.apache.nifi.processors.attributes.UpdateAttribute",
+                    "bundle": {
+                      "group": "org.apache.nifi",
+                      "artifact": "nifi-update-attribute-nar",
+                      "version": "1.17.0"
+                    },
+                    "properties": {
+                      "filename": "${s3.key}",
+                      "Store State": "Do not store state",
+                      "canonical-value-lookup-cache-size": "100"
+                    },
+                    "propertyDescriptors": {},
+                    "style": {},
+                    "schedulingPeriod": "0 sec",
+                    "schedulingStrategy": "TIMER_DRIVEN",
+                    "executionNode": "ALL",
+                    "penaltyDuration": "30 sec",
+                    "yieldDuration": "1 sec",
+                    "bulletinLevel": "WARN",
+                    "runDurationMillis": 0,
+                    "concurrentlySchedulableTaskCount": 1,
+                    "autoTerminatedRelationships": [],
+                    "scheduledState": "RUNNING",
+                    "retryCount": 10,
+                    "retriedRelationships": [],
+                    "backoffMechanism": "PENALIZE_FLOWFILE",
+                    "maxBackoffPeriod": "10 mins",
+                    "componentType": "PROCESSOR",
+                    "groupIdentifier": "4ea964dd-8582-3dab-b8c4-54eb1347e2bb"
+                  },
