@@ -3,10 +3,11 @@ import sys
 import re
 from collections import defaultdict
 
-# -------------------- Setup --------------------
+# -------------------- Output Settings --------------------
 output_file = "flow_variables_converted.json"
 summary_file = "replaced_variables_summary.json"
 
+# -------------------- Load Input --------------------
 if len(sys.argv) != 2:
     print("Usage: python scoped_replace.py <nifi_1.17_flow.json>")
     sys.exit(1)
@@ -16,39 +17,23 @@ input_path = sys.argv[1]
 with open(input_path, 'r') as f:
     flow_data = json.load(f)
 
+# -------------------- Replacement Tracking --------------------
 replaced_vars = defaultdict(set)
 
-# -------------------- Replace Helpers --------------------
-
-def replace_in_properties(props, var_names, source_pg_name):
+def replace_in_properties(props, available_vars, pg_name):
     if not isinstance(props, dict):
         return
     for key, val in props.items():
         if isinstance(val, str):
-            for var in var_names:
+            for var in available_vars:
                 pattern = r'\$\{\s*' + re.escape(var) + r'\s*\}'
-                if re.search(pattern, val):
-                    print(f"[DEBUG] Found '${{{var}}}' in '{key}' of PG '{source_pg_name}'")
                 new_val, count = re.subn(pattern, f'#{{{var}}}', val)
                 if count > 0:
                     props[key] = new_val
-                    replaced_vars[source_pg_name].add(var)
-                    print(f"[INFO] Replaced '${{{var}}}' → '#{{{var}}}' in '{key}' of PG '{source_pg_name}'")
+                    replaced_vars[pg_name].add(var)
+                    print(f"[INFO] In PG '{pg_name}': replaced '${{{var}}}' → '#{{{var}}}' in property '{key}'")
 
-def apply_replacement_in_pg_tree(group, var_names, source_pg_name):
-    # Processors
-    for processor in group.get("processors", []):
-        replace_in_properties(processor.get("config", {}).get("properties", {}), var_names, source_pg_name)
-
-    # Controller Services
-    for service in group.get("controllerServices", []):
-        replace_in_properties(service.get("properties", {}), var_names, source_pg_name)
-
-    # Recurse into children
-    for child_pg in group.get("processGroups", []):
-        apply_replacement_in_pg_tree(child_pg, var_names, source_pg_name)
-
-# -------------------- Traversal --------------------
+# -------------------- Traversal Logic --------------------
 
 def traverse_pg(group, inherited_vars):
     pg_name = group.get("name", f"Unnamed_{group.get('identifier', '')[:6]}")
@@ -57,28 +42,33 @@ def traverse_pg(group, inherited_vars):
 
     # Replace in processors
     for processor in group.get("processors", []):
-        props = processor.get("properties", {})  # ✅ FIXED LINE
+        props = processor.get("properties", {})  # ✅ Your actual structure
         replace_in_properties(props, available_vars, pg_name)
+
+    # Replace in controller services (if any)
+    for service in group.get("controllerServices", []):
+        replace_in_properties(service.get("properties", {}), available_vars, pg_name)
 
     # Recurse into nested PGs
     for child_pg in group.get("processGroups", []):
         traverse_pg(child_pg, available_vars)
 
-# -------------------- Execute --------------------
+# -------------------- Run --------------------
 
 if "rootGroup" not in flow_data:
-    raise KeyError("No 'rootGroup' found in JSON.")
+    raise KeyError("Missing 'rootGroup' in flow definition.")
 
+print("[*] Starting replacement from rootGroup...")
 root = flow_data["rootGroup"]
-traverse_all_groups(root)
+traverse_pg(root, set())
 
 # -------------------- Save Output --------------------
 
 with open(output_file, 'w') as f:
     json.dump(flow_data, f, indent=2)
-print(f"[✔] Updated flow saved to '{output_file}'")
+print(f"[✔] Flow file saved to: {output_file}")
 
 summary = {pg: sorted(list(vars)) for pg, vars in replaced_vars.items()}
 with open(summary_file, 'w') as f:
     json.dump(summary, f, indent=2)
-print(f"[✔] Replacement summary saved to '{summary_file}'")
+print(f"[✔] Replacement summary saved to: {summary_file}")
