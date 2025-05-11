@@ -45,22 +45,26 @@ def traverse_and_create_parameter_context(group):
         # Create a new Parameter Context for this PG
         pc_name = f"{pg_name}_Context"
         pc_id = str(uuid.uuid4())
+
+        # Handle inherited context
+        inherited_contexts = []
+        if "parameterContextName" in group:
+            old_pc_name = group["parameterContextName"]
+            inherited_contexts = [old_pc_name]
+            group["parameterContextName"] = pc_name  # Replace old with new
+        else:
+            group["parameterContextName"] = pc_name  # Set new if none
+
         parameter_context = {
             "identifier": pc_id,
             "instanceIdentifier": str(uuid.uuid4()),
             "name": pc_name,
             "parameters": parameters,
-            "inheritedParameterContexts": [],
+            "inheritedParameterContexts": inherited_contexts,
             "componentType": "PARAMETER_CONTEXT"
         }
 
         parameter_contexts.append(parameter_context)
-
-        # Handle PGs with existing parameterContextName
-        if "parameterContextName" in group:
-            group["parameterContextName_auto"] = pc_name
-        else:
-            group["parameterContextName"] = pc_name
 
     # Recurse into nested PGs
     for child in group.get("processGroups", []):
