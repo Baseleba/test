@@ -1,5 +1,46 @@
 #!/bin/bash
 
+# Header
+echo -e "InstanceName\tPrivateIP\tOS\tImageID\tAMIName"
+
+# Loop through instances
+aws ec2 describe-instances \
+  --query 'Reservations[].Instances[].[InstanceId, PrivateIpAddress, PlatformDetails, ImageId, Tags[?Key==`Name`]|[0].Value]' \
+  --output text | while read -r instance_id private_ip os image_id name; do
+  
+  ami_name=$(aws ec2 describe-images --image-ids "$image_id" \
+    --query 'Images[0].Name' --output text 2>/dev/null)
+
+  echo -e "${name:-N/A}\t${private_ip:-N/A}\t${os:-N/A}\t${image_id:-N/A}\t${ami_name:-N/A}"
+done | column -t -s $'\t'
+
+
+
+
+#!/bin/bash
+
+# Header
+echo "InstanceName,PrivateIP,OS,ImageID,AMIName"
+
+# Loop through instances
+aws ec2 describe-instances \
+  --query 'Reservations[].Instances[].[InstanceId, PrivateIpAddress, PlatformDetails, ImageId, Tags[?Key==`Name`]|[0].Value]' \
+  --output text | while read -r instance_id private_ip os image_id name; do
+
+  ami_name=$(aws ec2 describe-images --image-ids "$image_id" \
+    --query 'Images[0].Name' --output text 2>/dev/null)
+
+  echo "\"${name:-N/A}\",\"${private_ip:-N/A}\",\"${os:-N/A}\",\"${image_id:-N/A}\",\"${ami_name:-N/A}\""
+done
+
+
+
+
+
+
+
+#!/bin/bash
+
 echo -e "InstanceName\tPrivateIP\tOS\tImageID\tAMIName"
 
 # Get all instances with relevant metadata
