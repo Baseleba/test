@@ -1,3 +1,25 @@
+#!/bin/bash
+
+echo -e "InstanceName\tPrivateIP\tOS\tImageID\tAMIName"
+
+# Get all instances with relevant metadata
+aws ec2 describe-instances \
+  --query 'Reservations[].Instances[].[InstanceId, PrivateIpAddress, PlatformDetails, ImageId, Tags[?Key==`Name`]|[0].Value]' \
+  --output text | while read -r instance_id private_ip os image_id name; do
+  
+  # Get the AMI name for this image_id
+  ami_name=$(aws ec2 describe-images --image-ids "$image_id" \
+    --query 'Images[0].Name' \
+    --output text 2>/dev/null)
+
+  # Output the row
+  echo -e "${name:-N/A}\t${private_ip:-N/A}\t${os:-N/A}\t${image_id:-N/A}\t${ami_name:-N/A}"
+
+done | column -t -s $'\t'
+
+
+
+
 aws s3api select-object-content \
   --bucket aiq-logging \
   --key "s3-inventories/aiq-qdrive-inventory/data/5bec0881-bef4-4a59-8d57-f1ea3f4fcfc1.csv.gz" \
