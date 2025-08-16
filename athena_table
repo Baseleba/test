@@ -1,12 +1,22 @@
-SELECT
-  format(
-    's3://aws-cloudtrail-logs-<account-id>/AWSLogs/<account-id>/CloudTrail/%s/%s/%s/%s/',
-    region, year, month, day
-  ) AS path_guess,
-  COUNT(*) AS events_in_prefix
-FROM ct_logs.cloudtrail_events
-WHERE region='us-east-1'
-  AND year='2025'
-  AND month='08'
-  AND day='16'
-GROUP BY 1;
+-- Ensure LOCATION is correct
+ALTER TABLE ct_logs.cloudtrail_events
+SET LOCATION 's3://aws-cloudtrail-logs-764973944252-acca46c5/AWSLogs/764973944252/CloudTrail/';
+
+-- Enable partition projection with string enums
+ALTER TABLE ct_logs.cloudtrail_events SET TBLPROPERTIES (
+  'projection.enabled'='true',
+
+  'projection.region.type'='enum',
+  'projection.region.values'='us-east-1',
+
+  'projection.year.type'='enum',
+  'projection.year.values'='2025,2026',
+
+  'projection.month.type'='enum',
+  'projection.month.values'='01,02,03,04,05,06,07,08,09,10,11,12',
+
+  'projection.day.type'='enum',
+  'projection.day.values'='01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31',
+
+  'storage.location.template'='s3://aws-cloudtrail-logs-764973944252-acca46c5/AWSLogs/764973944252/CloudTrail/${region}/${year}/${month}/${day}/'
+);
