@@ -1,0 +1,45 @@
+CREATE EXTERNAL TABLE cloudtrail_logs (
+    eventVersion STRING,
+    userIdentity STRUCT<                 -- nested user identity info
+        type: STRING,
+        principalId: STRING,
+        arn: STRING,
+        accountId: STRING,
+        userName: STRING,
+        sessionContext: STRUCT<          -- further nested fields...
+            attributes: STRUCT<mfAuthenticated: STRING, creationDate: STRING>,
+            sessionIssuer: STRUCT<type: STRING, arn: STRING, accountId: STRING, userName: STRING>
+        >
+    >,
+    eventTime STRING,
+    eventSource STRING,
+    eventName STRING,
+    awsRegion STRING,
+    sourceIPAddress STRING,
+    userAgent STRING,
+    errorCode STRING,
+    errorMessage STRING,
+    requestParameters STRING,
+    responseElements STRING,
+    additionalEventData STRING,
+    requestID STRING,
+    eventID STRING,
+    readOnly STRING,
+    resources ARRAY<STRUCT<              -- array of resource ARNs, e.g. S3 bucket/object
+        arn: STRING,
+        accountId: STRING,
+        type: STRING
+    >>,
+    eventType STRING,
+    apiVersion STRING,
+    recipientAccountId STRING,
+    serviceEventDetails STRING,
+    sharedEventID STRING,
+    vpcEndpointId STRING,
+    eventCategory STRING
+)
+PARTITIONED BY (timestamp STRING)  -- will use date partitions (year/month/day)
+ROW FORMAT SERDE 'org.apache.hive.hcatalog.data.JsonSerDe'
+STORED AS INPUTFORMAT 'com.amazon.emr.cloudtrail.CloudTrailInputFormat'
+OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+LOCATION 's3://<your-bucket>/AWSLogs/<AccountID>/CloudTrail/us-east-1/'
