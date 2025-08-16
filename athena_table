@@ -1,7 +1,12 @@
-SELECT eventtime, eventname,
-       json_extract_scalar(requestparameters,'$.bucketName') AS bucket,
-       json_extract_scalar(requestparameters,'$.key')        AS object_key
+SELECT
+  format(
+    's3://aws-cloudtrail-logs-<account-id>/AWSLogs/<account-id>/CloudTrail/%s/%s/%s/%s/',
+    region, year, month, day
+  ) AS path_guess,
+  COUNT(*) AS events_in_prefix
 FROM ct_logs.cloudtrail_events
-WHERE eventsource='s3.amazonaws.com' AND eventcategory='Data'
-  AND region='us-east-1' AND year='2025' AND month='08' AND day='01'   -- adjust to a day with events
-LIMIT 50;
+WHERE region='us-east-1'
+  AND year='2025'
+  AND month='08'
+  AND day='16'
+GROUP BY 1;
