@@ -1,9 +1,9 @@
 SELECT
   eventtime,
   eventname,
-  requestparameters:bucketName AS bucket,
-  requestparameters:key        AS object_key,
-  useridentity.arn             AS actor
+  json_extract_scalar(requestparameters, '$.bucketName') AS bucket,
+  json_extract_scalar(requestparameters, '$.key')         AS object_key,
+  useridentity.arn                                       AS actor
 FROM ct_logs.cloudtrail_events
 WHERE eventsource = 's3.amazonaws.com'
   AND region = 'us-east-1'
