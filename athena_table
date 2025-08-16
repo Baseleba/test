@@ -1,6 +1,25 @@
-SELECT eventname, count(*) AS n
-FROM ct_logs.cloudtrail_events
-WHERE eventsource='s3.amazonaws.com'
-  AND region='us-east-1' AND year='2025' AND month='08' AND day='16'
-GROUP BY eventname
-ORDER BY n DESC;
+WITH s3 AS (
+  SELECT
+    from_iso8601_timestamp(eventtime)                             AS ts,
+    eventname,
+    try(json_extract_scalar(requestparameters, '$.bucketName'))   AS bucket,
+    try(json_extract_scalar(requestparameters, '$.key'))          AS object_key
+  FROM ct_logs.cloudtrail_events
+  WHERE eventsource = 's3.amazonaws.com'
+    AND region='us-east-1'
+    AND year='2025' AND month='08' AND day='16'
+    AND try(json_parse(requestparameters)) IS NOT NULL
+    AND eventname IN ('PutObject','GetObject','DeleteObject')
+)
+SELECT
+  bucket,
+  object_key,
+  min(ts)  FILTER (WHERE eventname='PutObject')      AS first_put,
+  max(ts)  FILTER (WHERE eventname='GetObject')      AS last_get,
+  count_if(eventname='GetObject')                    AS total_reads,
+  max(ts)  FILTER (WHERE eventname='DeleteObject')   AS delete_time
+FROM s3
+WHERE bucket IS NOT NULL AND object_key IS NOT NULL
+GROUP BY 1,2
+ORDER BY bucket, object_key
+LIMIT 500;
