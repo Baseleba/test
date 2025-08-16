@@ -1,25 +1,49 @@
-WITH s3 AS (
+-- INPUTS -------------------------------------------------------
+-- Set your 6-month window (inclusive)
+-- Example: March → August 2025
+WITH params AS (
   SELECT
-    from_iso8601_timestamp(eventtime)                             AS ts,
+    'your-bucket-name' AS bucket,
+    'us-east-1'        AS region,
+    DATE '2025-03-01'  AS start_month,   -- first day of first month
+    DATE '2025-08-01'  AS end_month      -- first day of last month
+),
+-- Expand to a month list for partition pruning
+months AS (
+  SELECT date_format(m, '%Y') AS yr, date_format(m, '%m') AS mo
+  FROM params,
+       UNNEST(
+         SEQUENCE(start_month, end_month, INTERVAL '1' MONTH)
+       ) AS t(m)
+),
+-- Pull CloudTrail S3 data events for only the months in range
+s3 AS (
+  SELECT
+    from_iso8601_timestamp(eventtime)                               AS ts,
     eventname,
-    try(json_extract_scalar(requestparameters, '$.bucketName'))   AS bucket,
-    try(json_extract_scalar(requestparameters, '$.key'))          AS object_key
-  FROM ct_logs.cloudtrail_events
-  WHERE eventsource = 's3.amazonaws.com'
-    AND region='us-east-1'
-    AND year='2025' AND month='08' AND day='16'
+    try(json_extract_scalar(requestparameters, '$.bucketName'))     AS bucket,
+    try(json_extract_scalar(requestparameters, '$.key'))            AS object_key
+  FROM ct_logs.cloudtrail_events t
+  JOIN months m
+    ON t.year  = m.yr
+   AND t.month = m.mo
+  JOIN params p
+    ON t.region = p.region
+  WHERE t.eventsource = 's3.amazonaws.com'
     AND try(json_parse(requestparameters)) IS NOT NULL
     AND eventname IN ('PutObject','GetObject','DeleteObject')
+    AND json_extract_scalar(requestparameters, '$.bucketName') = (SELECT bucket FROM params)
 )
+-- Lifecycle per object
 SELECT
   bucket,
   object_key,
-  min(ts)  FILTER (WHERE eventname='PutObject')      AS first_put,
-  max(ts)  FILTER (WHERE eventname='GetObject')      AS last_get,
-  count_if(eventname='GetObject')                    AS total_reads,
-  max(ts)  FILTER (WHERE eventname='DeleteObject')   AS delete_time
+  MIN(ts)  FILTER (WHERE eventname='PutObject')     AS first_put,
+  MAX(ts)  FILTER (WHERE eventname='GetObject')     AS last_get,
+  COUNT_IF(eventname='GetObject')                   AS total_reads,
+  MAX(ts)  FILTER (WHERE eventname='DeleteObject')  AS delete_time
 FROM s3
 WHERE bucket IS NOT NULL AND object_key IS NOT NULL
 GROUP BY 1,2
 ORDER BY bucket, object_key
-LIMIT 500;
+LIMIT 1000;
