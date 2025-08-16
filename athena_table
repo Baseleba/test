@@ -1,11 +1,7 @@
--- 1) Create (or switch to) your database
-CREATE DATABASE IF NOT EXISTS ct_logs;
-USE ct_logs;
-
--- 2) Create the CloudTrail table with partition projection
-CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_events (
-  eventVersion               string,
-  userIdentity               struct<
+DROP TABLE IF EXISTS ct_logs.cloudtrail_events_bydate;
+CREATE EXTERNAL TABLE ct_logs.cloudtrail_events_bydate (
+  eventVersion string,
+  userIdentity struct<
     type:string,
     principalId:string,
     arn:string,
@@ -17,39 +13,37 @@ CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_events (
       sessionIssuer:struct<type:string,principalId:string,arn:string,accountId:string,userName:string>
     >
   >,
-  eventTime                  string,
-  eventSource                string,
-  eventName                  string,
-  awsRegion                  string,
-  sourceIPAddress            string,
-  userAgent                  string,
-  errorCode                  string,
-  errorMessage               string,
-  requestParameters          string,
-  responseElements           string,
-  additionalEventData        string,
-  requestID                  string,
-  eventID                    string,
-  readOnly                   string,
-  resources                  array<struct<arn:string,accountId:string,type:string>>,
-  eventType                  string,
-  apiVersion                 string,
-  recipientAccountId         string,
-  serviceEventDetails        string,
-  sharedEventID              string,
-  vpcEndpointId              string,
-  eventCategory              string
+  eventTime string,
+  eventSource string,
+  eventName string,
+  awsRegion string,
+  sourceIPAddress string,
+  userAgent string,
+  errorCode string,
+  errorMessage string,
+  requestParameters string,
+  responseElements string,
+  additionalEventData string,
+  requestID string,
+  eventID string,
+  readOnly string,
+  resources array<struct<arn:string,accountId:string,type:string>>,
+  eventType string,
+  apiVersion string,
+  recipientAccountId string,
+  serviceEventDetails string,
+  sharedEventID string,
+  vpcEndpointId string,
+  eventCategory string
 )
-PARTITIONED BY (region string, year string, month string, day string)
+PARTITIONED BY (dt date)
 ROW FORMAT SERDE 'com.amazon.emr.hive.serde.CloudTrailSerde'
 STORED AS INPUTFORMAT 'com.amazon.emr.cloudtrail.CloudTrailInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
-LOCATION 's3://LOG_BUCKET/AWSLogs/ACCOUNT_ID/CloudTrail/'
+LOCATION 's3://LOG_BUCKET/AWSLogs/ACCOUNT_ID/CloudTrail/us-east-1/'
 TBLPROPERTIES (
   'projection.enabled'='true',
-  'projection.region.values'='us-east-1',                         -- comma-separate if multiple regions
-  'projection.year.type'='integer',  'projection.year.range'='2020,2035',
-  'projection.month.type'='integer', 'projection.month.range'='1,12',  'projection.month.digits'='2',
-  'projection.day.type'='integer',   'projection.day.range'='1,31',    'projection.day.digits'='2',
-  'storage.location.template'='s3://LOG_BUCKET/AWSLogs/ACCOUNT_ID/CloudTrail/${region}/${year}/${month}/${day}/'
+  'projection.dt.type'='date',
+  'projection.dt.range'='2020-01-01,NOW',
+  'storage.location.template'='s3://LOG_BUCKET/AWSLogs/ACCOUNT_ID/CloudTrail/us-east-1/${dt}/'
 );
