@@ -1,49 +1,58 @@
--- INPUTS -------------------------------------------------------
--- Set your 6-month window (inclusive)
--- Example: March → August 2025
+-- inputs: 6-month window (inclusive)
 WITH params AS (
   SELECT
     'your-bucket-name' AS bucket,
     'us-east-1'        AS region,
-    DATE '2025-03-01'  AS start_month,   -- first day of first month
-    DATE '2025-08-01'  AS end_month      -- first day of last month
+    DATE '2025-03-01'  AS start_month,
+    DATE '2025-08-01'  AS end_month
 ),
--- Expand to a month list for partition pruning
 months AS (
   SELECT date_format(m, '%Y') AS yr, date_format(m, '%m') AS mo
-  FROM params,
-       UNNEST(
-         SEQUENCE(start_month, end_month, INTERVAL '1' MONTH)
-       ) AS t(m)
+  FROM params, UNNEST(SEQUENCE(start_month, end_month, INTERVAL '1' MONTH)) AS t(m)
 ),
--- Pull CloudTrail S3 data events for only the months in range
-s3 AS (
+base AS (
   SELECT
-    from_iso8601_timestamp(eventtime)                               AS ts,
+    from_iso8601_timestamp(eventtime) AS ts,
     eventname,
-    try(json_extract_scalar(requestparameters, '$.bucketName'))     AS bucket,
-    try(json_extract_scalar(requestparameters, '$.key'))            AS object_key
+    -- object identity
+    try(json_extract_scalar(requestparameters, '$.bucketName')) AS bucket,
+    try(json_extract_scalar(requestparameters, '$.key'))        AS object_key,
+    -- version id can appear in request OR response
+    coalesce(
+      try(json_extract_scalar(requestparameters, '$.versionId')),
+      try(json_extract_scalar(responseelements, '$.x-amz-version-id')),
+      try(json_extract_scalar(responseelements, '$.versionId'))
+    ) AS version_id,
+    -- delete-marker flag can be in response
+    (lower(coalesce(
+       try(json_extract_scalar(responseelements, '$.x-amz-delete-marker')),
+       try(json_extract_scalar(responseelements, '$.deleteMarker'))
+     )) = 'true') AS is_delete_marker
   FROM ct_logs.cloudtrail_events t
   JOIN months m
-    ON t.year  = m.yr
-   AND t.month = m.mo
+    ON t.year = m.yr AND t.month = m.mo
   JOIN params p
     ON t.region = p.region
   WHERE t.eventsource = 's3.amazonaws.com'
     AND try(json_parse(requestparameters)) IS NOT NULL
-    AND eventname IN ('PutObject','GetObject','DeleteObject')
     AND json_extract_scalar(requestparameters, '$.bucketName') = (SELECT bucket FROM params)
+    -- include write ops that create a new version, reads, and deletes
+    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload','GetObject','DeleteObject')
 )
--- Lifecycle per object
 SELECT
   bucket,
   object_key,
-  MIN(ts)  FILTER (WHERE eventname='PutObject')     AS first_put,
-  MAX(ts)  FILTER (WHERE eventname='GetObject')     AS last_get,
-  COUNT_IF(eventname='GetObject')                   AS total_reads,
-  MAX(ts)  FILTER (WHERE eventname='DeleteObject')  AS delete_time
-FROM s3
+  coalesce(version_id, '__latest__') AS version_id,   -- NULL when GET/DELETE acted on "latest"
+  MIN(ts) FILTER (WHERE eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')) AS first_write,
+  MAX(ts) FILTER (WHERE eventname = 'GetObject')                                           AS last_get,
+  COUNT_IF(eventname = 'GetObject')                                                        AS total_reads,
+  -- soft delete (placing a delete marker)
+  MAX(ts) FILTER (WHERE eventname = 'DeleteObject' AND is_delete_marker)                   AS delete_marker_time,
+  -- hard delete of a specific version (no marker)
+  MAX(ts) FILTER (WHERE eventname = 'DeleteObject' AND NOT is_delete_marker AND version_id IS NOT NULL)
+                                                                                           AS hard_delete_time
+FROM base
 WHERE bucket IS NOT NULL AND object_key IS NOT NULL
-GROUP BY 1,2
-ORDER BY bucket, object_key
+GROUP BY 1,2,3
+ORDER BY bucket, object_key, version_id
 LIMIT 1000;
