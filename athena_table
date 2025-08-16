@@ -1,14 +1,6 @@
-SELECT
-  eventtime,
-  eventname,
-  try(json_extract_scalar(requestparameters, '$.bucketName')) AS bucket,
-  try(json_extract_scalar(requestparameters, '$.key'))         AS object_key,
-  useridentity.arn                                            AS actor
+SELECT eventname, count(*) AS n
 FROM ct_logs.cloudtrail_events
-WHERE eventsource = 's3.amazonaws.com'
+WHERE eventsource='s3.amazonaws.com'
   AND region='us-east-1' AND year='2025' AND month='08' AND day='16'
-  -- keep only rows where requestparameters is valid JSON
-  AND try(json_parse(requestparameters)) IS NOT NULL
-  AND eventname IN ('PutObject','GetObject','DeleteObject','CopyObject','PutObjectAcl')
-ORDER BY eventtime
-LIMIT 50;
+GROUP BY eventname
+ORDER BY n DESC;
