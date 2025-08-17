@@ -1,51 +1,67 @@
--- === inputs ===
+-- ===== Inputs =====================================================
 WITH params AS (
   SELECT
-    'your-bucket-name' AS bucket,          -- << change
-    'us-east-1'        AS region,          -- << change if needed
-    DATE '2025-03-01'  AS start_month,     -- << window start (YYYY-MM-01)
-    DATE '2025-08-01'  AS end_month        -- << window end   (YYYY-MM-01)
+    'your-bucket-name' AS bucket,    -- <<< change
+    'us-east-1'        AS region,    -- <<< change if needed
+    DATE '2025-03-01'  AS put_start, -- <<< window start (YYYY-MM-01)
+    DATE '2025-08-01'  AS put_end    -- <<< window end   (YYYY-MM-01)
 ),
-months AS (
-  SELECT date_format(m, '%Y') AS yr, date_format(m, '%m') AS mo
-  FROM params, UNNEST(SEQUENCE(start_month, end_month, INTERVAL '1' MONTH)) AS t(m)
+
+-- Months to scan for PUTs (exact 6-month window)
+months_put AS (
+  SELECT date_format(d,'%Y') AS yr, date_format(d,'%m') AS mo
+  FROM params, UNNEST(SEQUENCE(put_start, put_end, INTERVAL '1' MONTH)) t(d)
 ),
-events AS (
+
+-- Months to scan for GETs (PUT window + 2 months)
+months_get AS (
+  SELECT date_format(d,'%Y') AS yr, date_format(d,'%m') AS mo
+  FROM params, UNNEST(SEQUENCE(put_start, put_end + INTERVAL '2' MONTH, INTERVAL '1' MONTH)) t(d)
+),
+
+-- First write per object within the 6-month window
+puts AS (
   SELECT
-    from_iso8601_timestamp(eventtime)                           AS ts,
-    eventname,
-    try(json_extract_scalar(requestparameters,'$.bucketName'))  AS bucket,
-    try(json_extract_scalar(requestparameters,'$.key'))         AS object_key
+    try(json_extract_scalar(requestparameters,'$.bucketName')) AS bucket,
+    try(json_extract_scalar(requestparameters,'$.key'))        AS object_key,
+    min(from_iso8601_timestamp(eventtime))                    AS first_put
   FROM ct_logs.cloudtrail_events t
-  JOIN months m ON t.year = m.yr AND t.month = m.mo
-  JOIN params p ON t.region = p.region
+  JOIN months_put mp ON t.year = mp.yr AND t.month = mp.mo
+  JOIN params p       ON t.region = p.region
   WHERE t.eventsource = 's3.amazonaws.com'
     AND try(json_parse(requestparameters)) IS NOT NULL
     AND json_extract_scalar(requestparameters,'$.bucketName') = (SELECT bucket FROM params)
-    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload','GetObject')
-),
-puts AS (  -- first time each object was written
-  SELECT bucket, object_key, MIN(ts) AS first_put
-  FROM events
-  WHERE eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')
+    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')
   GROUP BY 1,2
 ),
-first_reads AS (  -- first read that happened after the put
-  SELECT p.bucket, p.object_key, p.first_put, MIN(e.ts) AS first_get_after_put
-  FROM puts p
-  JOIN events e
-    ON e.bucket = p.bucket AND e.object_key = p.object_key
-   AND e.eventname = 'GetObject' AND e.ts >= p.first_put
-  GROUP BY 1,2,3
+
+-- All reads for those objects in the extended (+2 mo) window
+gets AS (
+  SELECT
+    try(json_extract_scalar(requestparameters,'$.bucketName')) AS bucket,
+    try(json_extract_scalar(requestparameters,'$.key'))        AS object_key,
+    from_iso8601_timestamp(eventtime)                         AS ts
+  FROM ct_logs.cloudtrail_events t
+  JOIN months_get mg ON t.year = mg.yr AND t.month = mg.mo
+  JOIN params p      ON t.region = p.region
+  WHERE t.eventsource = 's3.amazonaws.com'
+    AND try(json_parse(requestparameters)) IS NOT NULL
+    AND eventname = 'GetObject'
+    AND json_extract_scalar(requestparameters,'$.bucketName') = (SELECT bucket FROM params)
 )
+
+-- Objects that had a read >= 2 months after upload
 SELECT
-  bucket,
-  object_key,
-  first_put,
-  first_get_after_put,
-  date_diff('day', first_put, first_get_after_put)  AS days_after,
-  date_diff('month', first_put, first_get_after_put) AS months_after
-FROM first_reads
-WHERE first_get_after_put >= first_put + INTERVAL '2' MONTH   -- << 2-month rule
+  p.bucket,
+  p.object_key,
+  p.first_put,
+  MIN(g.ts) AS first_get_after_put,
+  date_diff('day',   p.first_put, MIN(g.ts))  AS days_after,
+  date_diff('month', p.first_put, MIN(g.ts))  AS months_after
+FROM puts p
+JOIN gets g
+  ON g.bucket = p.bucket AND g.object_key = p.object_key
+ AND g.ts >= p.first_put + INTERVAL '2' MONTH
+GROUP BY 1,2,3
 ORDER BY days_after DESC
 LIMIT 1000;
