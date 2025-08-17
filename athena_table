@@ -1,58 +1,51 @@
--- inputs: 6-month window (inclusive)
+-- === inputs ===
 WITH params AS (
   SELECT
-    'your-bucket-name' AS bucket,
-    'us-east-1'        AS region,
-    DATE '2025-03-01'  AS start_month,
-    DATE '2025-08-01'  AS end_month
+    'your-bucket-name' AS bucket,          -- << change
+    'us-east-1'        AS region,          -- << change if needed
+    DATE '2025-03-01'  AS start_month,     -- << window start (YYYY-MM-01)
+    DATE '2025-08-01'  AS end_month        -- << window end   (YYYY-MM-01)
 ),
 months AS (
   SELECT date_format(m, '%Y') AS yr, date_format(m, '%m') AS mo
   FROM params, UNNEST(SEQUENCE(start_month, end_month, INTERVAL '1' MONTH)) AS t(m)
 ),
-base AS (
+events AS (
   SELECT
-    from_iso8601_timestamp(eventtime) AS ts,
+    from_iso8601_timestamp(eventtime)                           AS ts,
     eventname,
-    -- object identity
-    try(json_extract_scalar(requestparameters, '$.bucketName')) AS bucket,
-    try(json_extract_scalar(requestparameters, '$.key'))        AS object_key,
-    -- version id can appear in request OR response
-    coalesce(
-      try(json_extract_scalar(requestparameters, '$.versionId')),
-      try(json_extract_scalar(responseelements, '$.x-amz-version-id')),
-      try(json_extract_scalar(responseelements, '$.versionId'))
-    ) AS version_id,
-    -- delete-marker flag can be in response
-    (lower(coalesce(
-       try(json_extract_scalar(responseelements, '$.x-amz-delete-marker')),
-       try(json_extract_scalar(responseelements, '$.deleteMarker'))
-     )) = 'true') AS is_delete_marker
+    try(json_extract_scalar(requestparameters,'$.bucketName'))  AS bucket,
+    try(json_extract_scalar(requestparameters,'$.key'))         AS object_key
   FROM ct_logs.cloudtrail_events t
-  JOIN months m
-    ON t.year = m.yr AND t.month = m.mo
-  JOIN params p
-    ON t.region = p.region
+  JOIN months m ON t.year = m.yr AND t.month = m.mo
+  JOIN params p ON t.region = p.region
   WHERE t.eventsource = 's3.amazonaws.com'
     AND try(json_parse(requestparameters)) IS NOT NULL
-    AND json_extract_scalar(requestparameters, '$.bucketName') = (SELECT bucket FROM params)
-    -- include write ops that create a new version, reads, and deletes
-    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload','GetObject','DeleteObject')
+    AND json_extract_scalar(requestparameters,'$.bucketName') = (SELECT bucket FROM params)
+    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload','GetObject')
+),
+puts AS (  -- first time each object was written
+  SELECT bucket, object_key, MIN(ts) AS first_put
+  FROM events
+  WHERE eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')
+  GROUP BY 1,2
+),
+first_reads AS (  -- first read that happened after the put
+  SELECT p.bucket, p.object_key, p.first_put, MIN(e.ts) AS first_get_after_put
+  FROM puts p
+  JOIN events e
+    ON e.bucket = p.bucket AND e.object_key = p.object_key
+   AND e.eventname = 'GetObject' AND e.ts >= p.first_put
+  GROUP BY 1,2,3
 )
 SELECT
   bucket,
   object_key,
-  coalesce(version_id, '__latest__') AS version_id,   -- NULL when GET/DELETE acted on "latest"
-  MIN(ts) FILTER (WHERE eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')) AS first_write,
-  MAX(ts) FILTER (WHERE eventname = 'GetObject')                                           AS last_get,
-  COUNT_IF(eventname = 'GetObject')                                                        AS total_reads,
-  -- soft delete (placing a delete marker)
-  MAX(ts) FILTER (WHERE eventname = 'DeleteObject' AND is_delete_marker)                   AS delete_marker_time,
-  -- hard delete of a specific version (no marker)
-  MAX(ts) FILTER (WHERE eventname = 'DeleteObject' AND NOT is_delete_marker AND version_id IS NOT NULL)
-                                                                                           AS hard_delete_time
-FROM base
-WHERE bucket IS NOT NULL AND object_key IS NOT NULL
-GROUP BY 1,2,3
-ORDER BY bucket, object_key, version_id
+  first_put,
+  first_get_after_put,
+  date_diff('day', first_put, first_get_after_put)  AS days_after,
+  date_diff('month', first_put, first_get_after_put) AS months_after
+FROM first_reads
+WHERE first_get_after_put >= first_put + INTERVAL '2' MONTH   -- << 2-month rule
+ORDER BY days_after DESC
 LIMIT 1000;
