@@ -1,25 +1,26 @@
--- ===== Inputs =====================================================
+-- ===== Inputs =====
 WITH params AS (
   SELECT
-    'your-bucket-name' AS bucket,    -- <<< change
-    'us-east-1'        AS region,    -- <<< change if needed
-    DATE '2025-03-01'  AS put_start, -- <<< window start (YYYY-MM-01)
-    DATE '2025-08-01'  AS put_end    -- <<< window end   (YYYY-MM-01)
+    'your-bucket-name' AS bucket,      -- << change
+    'us-east-1'        AS region,      -- << change if needed
+    DATE '2025-03-01'  AS put_start,   -- first month to include PUTs (YYYY-MM-01)
+    DATE '2025-08-01'  AS put_end,     -- last month to include PUTs   (YYYY-MM-01)
+    12                 AS read_ext_mo  -- extend GET scan window by N months beyond put_end
 ),
 
--- Months to scan for PUTs (exact 6-month window)
+-- Months to scan for PUTs (exact window)
 months_put AS (
   SELECT date_format(d,'%Y') AS yr, date_format(d,'%m') AS mo
   FROM params, UNNEST(SEQUENCE(put_start, put_end, INTERVAL '1' MONTH)) t(d)
 ),
 
--- Months to scan for GETs (PUT window + 2 months)
+-- Months to scan for GETs (PUT window + N months)
 months_get AS (
   SELECT date_format(d,'%Y') AS yr, date_format(d,'%m') AS mo
-  FROM params, UNNEST(SEQUENCE(put_start, put_end + INTERVAL '2' MONTH, INTERVAL '1' MONTH)) t(d)
+  FROM params, UNNEST(SEQUENCE(put_start, put_end + INTERVAL (SELECT read_ext_mo FROM params) MONTH, INTERVAL '1' MONTH)) t(d)
 ),
 
--- First write per object within the 6-month window
+-- First write per object within the PUT window
 puts AS (
   SELECT
     try(json_extract_scalar(requestparameters,'$.bucketName')) AS bucket,
@@ -27,7 +28,7 @@ puts AS (
     min(from_iso8601_timestamp(eventtime))                    AS first_put
   FROM ct_logs.cloudtrail_events t
   JOIN months_put mp ON t.year = mp.yr AND t.month = mp.mo
-  JOIN params p       ON t.region = p.region
+  JOIN params p      ON t.region = p.region
   WHERE t.eventsource = 's3.amazonaws.com'
     AND try(json_parse(requestparameters)) IS NOT NULL
     AND json_extract_scalar(requestparameters,'$.bucketName') = (SELECT bucket FROM params)
@@ -35,7 +36,7 @@ puts AS (
   GROUP BY 1,2
 ),
 
--- All reads for those objects in the extended (+2 mo) window
+-- All reads for those objects in the extended window
 gets AS (
   SELECT
     try(json_extract_scalar(requestparameters,'$.bucketName')) AS bucket,
@@ -50,18 +51,18 @@ gets AS (
     AND json_extract_scalar(requestparameters,'$.bucketName') = (SELECT bucket FROM params)
 )
 
--- Objects that had a read >= 2 months after upload
+-- Per-object lifecycle: first_put, last_get, total_reads, and gap in months/days
 SELECT
   p.bucket,
   p.object_key,
   p.first_put,
-  MIN(g.ts) AS first_get_after_put,
-  date_diff('day',   p.first_put, MIN(g.ts))  AS days_after,
-  date_diff('month', p.first_put, MIN(g.ts))  AS months_after
+  MAX(g.ts)                                          AS last_get,
+  COUNT(g.ts)                                        AS total_reads,
+  date_diff('month', p.first_put, MAX(g.ts))         AS months_from_put_to_last_get,  -- NULL if never read
+  date_diff('day',   p.first_put, MAX(g.ts))         AS days_from_put_to_last_get     -- NULL if never read
 FROM puts p
-JOIN gets g
-  ON g.bucket = p.bucket AND g.object_key = p.object_key
- AND g.ts >= p.first_put + INTERVAL '2' MONTH
+LEFT JOIN gets g
+       ON g.bucket = p.bucket AND g.object_key = p.object_key
 GROUP BY 1,2,3
-ORDER BY days_after DESC
-LIMIT 1000;
+ORDER BY months_from_put_to_last_get DESC NULLS LAST
+LIMIT 5000;
