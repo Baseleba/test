@@ -1,16 +1,73 @@
--- reuse the same CTEs as above down to obj, then:
-SELECT bucket, objects, ROUND(100.0 * objects / SUM(objects) OVER (), 2) AS pct
+-- CHANGE ME 👇 (same inputs as above)
+WITH params AS (
+  SELECT
+    'your-bucket-name' AS bucket,
+    'us-east-1'        AS region,
+    DATE '2025-03-01'  AS put_start,
+    DATE '2025-08-01'  AS put_end,
+    12                 AS read_ext_mo
+),
+months_put AS (
+  SELECT date_format(m,'%Y') yr, date_format(m,'%m') mo
+  FROM params p,
+       UNNEST(SEQUENCE(p.put_start, p.put_end, INTERVAL '1' MONTH)) AS t(m)
+),
+months_get AS (
+  SELECT date_format(m,'%Y') yr, date_format(m,'%m') mo
+  FROM params p,
+       UNNEST(SEQUENCE(p.put_start, date_add('month', p.read_ext_mo, p.put_end), INTERVAL '1' MONTH)) AS t(m)
+),
+puts AS (
+  SELECT
+    try(json_extract_scalar(requestparameters,'$.bucketName')) AS bucket,
+    try(json_extract_scalar(requestparameters,'$.key'))        AS object_key,
+    MIN(from_iso8601_timestamp(eventtime))                    AS first_put
+  FROM ct_logs.cloudtrail_events t
+  JOIN months_put mp ON t.year=mp.yr AND t.month=mp.mo
+  JOIN params p ON t.region=p.region
+  WHERE t.eventsource='s3.amazonaws.com'
+    AND try(json_parse(requestparameters)) IS NOT NULL
+    AND json_extract_scalar(requestparameters,'$.bucketName')=(SELECT bucket FROM params)
+    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')
+  GROUP BY 1,2
+),
+gets AS (
+  SELECT
+    try(json_extract_scalar(requestparameters,'$.bucketName')) AS bucket,
+    try(json_extract_scalar(requestparameters,'$.key'))        AS object_key,
+    from_iso8601_timestamp(eventtime)                          AS ts
+  FROM ct_logs.cloudtrail_events t
+  JOIN months_get mg ON t.year=mg.yr AND t.month=mg.mo
+  JOIN params p ON t.region=p.region
+  WHERE t.eventsource='s3.amazonaws.com'
+    AND try(json_parse(requestparameters)) IS NOT NULL
+    AND eventname='GetObject'
+    AND json_extract_scalar(requestparameters,'$.bucketName')=(SELECT bucket FROM params)
+),
+obj AS (
+  SELECT
+    p.bucket, p.object_key, p.first_put,
+    MAX(g.ts) AS last_get,
+    COUNT(g.ts) AS total_reads,
+    date_diff('month', p.first_put, MAX(g.ts)) AS months_from_put_to_last_get,
+    date_diff('day',   p.first_put, MAX(g.ts)) AS days_from_put_to_last_get
+  FROM puts p
+  LEFT JOIN gets g ON g.bucket=p.bucket AND g.object_key=p.object_key
+  GROUP BY 1,2,3
+)
+SELECT bucket_label AS bucket, objects,
+       ROUND(100.0 * objects / SUM(objects) OVER (), 2) AS pct
 FROM (
   SELECT
     CASE
-      WHEN last_get IS NULL                    THEN 'never_read'
-      WHEN months_from_put_to_last_get = 0     THEN '0 mo'
-      WHEN months_from_put_to_last_get = 1     THEN '1 mo'
+      WHEN last_get IS NULL                       THEN 'never_read'
+      WHEN months_from_put_to_last_get = 0        THEN '0 mo'
+      WHEN months_from_put_to_last_get = 1        THEN '1 mo'
       WHEN months_from_put_to_last_get BETWEEN 2 AND 3  THEN '2-3 mo'
       WHEN months_from_put_to_last_get BETWEEN 4 AND 6  THEN '4-6 mo'
       WHEN months_from_put_to_last_get BETWEEN 7 AND 12 THEN '7-12 mo'
       ELSE '>12 mo'
-    END AS bucket,
+    END AS bucket_label,
     COUNT(*) AS objects
   FROM obj
   GROUP BY 1
