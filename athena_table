@@ -1,76 +1,27 @@
--- ===== Inputs =====
-WITH params AS (
+-- reuse the same CTEs as above down to obj, then:
+SELECT bucket, objects, ROUND(100.0 * objects / SUM(objects) OVER (), 2) AS pct
+FROM (
   SELECT
-    'your-bucket-name' AS bucket,          -- << change
-    'us-east-1'        AS region,          -- << change if needed
-    DATE '2025-03-01'  AS put_start,       -- first month to include PUTs (YYYY-MM-01)
-    DATE '2025-08-01'  AS put_end,         -- last month to include PUTs  (YYYY-MM-01)
-    12                 AS read_ext_mo      -- extend GET scan by N months beyond put_end
-),
-
--- Months to scan for PUTs (exact window)
-months_put AS (
-  SELECT date_format(m, '%Y') AS yr, date_format(m, '%m') AS mo
-  FROM params p,
-       UNNEST(SEQUENCE(p.put_start, p.put_end, INTERVAL '1' MONTH)) AS t(m)
-),
-
--- Months to scan for GETs (PUT window + N months)  << FIXED
-months_get AS (
-  SELECT date_format(m, '%Y') AS yr, date_format(m, '%m') AS mo
-  FROM params p,
-       UNNEST(
-         SEQUENCE(
-           p.put_start,
-           date_add('month', p.read_ext_mo, p.put_end),  -- compute end date first
-           INTERVAL '1' MONTH
-         )
-       ) AS t(m)
-),
-
--- First write per object within the PUT window
-puts AS (
-  SELECT
-    try(json_extract_scalar(requestparameters, '$.bucketName')) AS bucket,
-    try(json_extract_scalar(requestparameters, '$.key'))        AS object_key,
-    MIN(from_iso8601_timestamp(eventtime))                      AS first_put
-  FROM ct_logs.cloudtrail_events t
-  JOIN months_put mp ON t.year = mp.yr AND t.month = mp.mo
-  JOIN params p      ON t.region = p.region
-  WHERE t.eventsource = 's3.amazonaws.com'
-    AND try(json_parse(requestparameters)) IS NOT NULL
-    AND json_extract_scalar(requestparameters, '$.bucketName') = (SELECT bucket FROM params)
-    AND eventname IN ('PutObject','CopyObject','CompleteMultipartUpload')
-  GROUP BY 1,2
-),
-
--- All reads for those objects in the extended window
-gets AS (
-  SELECT
-    try(json_extract_scalar(requestparameters, '$.bucketName')) AS bucket,
-    try(json_extract_scalar(requestparameters, '$.key'))        AS object_key,
-    from_iso8601_timestamp(eventtime)                           AS ts
-  FROM ct_logs.cloudtrail_events t
-  JOIN months_get mg ON t.year = mg.yr AND t.month = mg.mo
-  JOIN params p      ON t.region = p.region
-  WHERE t.eventsource = 's3.amazonaws.com'
-    AND try(json_parse(requestparameters)) IS NOT NULL
-    AND eventname = 'GetObject'
-    AND json_extract_scalar(requestparameters, '$.bucketName') = (SELECT bucket FROM params)
+    CASE
+      WHEN last_get IS NULL                    THEN 'never_read'
+      WHEN months_from_put_to_last_get = 0     THEN '0 mo'
+      WHEN months_from_put_to_last_get = 1     THEN '1 mo'
+      WHEN months_from_put_to_last_get BETWEEN 2 AND 3  THEN '2-3 mo'
+      WHEN months_from_put_to_last_get BETWEEN 4 AND 6  THEN '4-6 mo'
+      WHEN months_from_put_to_last_get BETWEEN 7 AND 12 THEN '7-12 mo'
+      ELSE '>12 mo'
+    END AS bucket,
+    COUNT(*) AS objects
+  FROM obj
+  GROUP BY 1
 )
-
--- Per-object lifecycle: first_put, last_get, total_reads, and gap in months/days
-SELECT
-  p.bucket,
-  p.object_key,
-  p.first_put,
-  MAX(g.ts)                                          AS last_get,
-  COUNT(g.ts)                                        AS total_reads,
-  date_diff('month', p.first_put, MAX(g.ts))         AS months_from_put_to_last_get,
-  date_diff('day',   p.first_put, MAX(g.ts))         AS days_from_put_to_last_get
-FROM puts p
-LEFT JOIN gets g
-       ON g.bucket = p.bucket AND g.object_key = p.object_key
-GROUP BY 1,2,3
-ORDER BY months_from_put_to_last_get DESC NULLS LAST
-LIMIT 5000;
+ORDER BY
+  CASE bucket
+    WHEN 'never_read' THEN 0
+    WHEN '0 mo' THEN 1
+    WHEN '1 mo' THEN 2
+    WHEN '2-3 mo' THEN 3
+    WHEN '4-6 mo' THEN 4
+    WHEN '7-12 mo' THEN 5
+    ELSE 6
+  END;
