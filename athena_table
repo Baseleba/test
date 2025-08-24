@@ -9,14 +9,20 @@ WITH ev AS (
   FROM ct_logs.cloudtrail_events c
   LEFT JOIN UNNEST(c.resources) AS t(r) ON TRUE
   WHERE c.eventsource = 's3.amazonaws.com'
-    AND c.year='2025' AND c.month='08' AND c.day='16'
+    AND c.year  = '2025'
+    AND c.month = '08'
+    AND c.day   = '16'
     AND DATE(from_iso8601_timestamp(c.eventtime)) = DATE '2025-08-16'
+    AND (
+      json_extract_scalar(c.requestparameters, '$.bucketName') IS NOT NULL
+      OR regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) IS NOT NULL
+    )
 )
+
 SELECT
+  bucket,
   eventname,
-  COUNT(DISTINCT eventid) AS total_all,
-  COUNT(DISTINCT CASE WHEN bucket IS NOT NULL THEN eventid END) AS total_with_bucket,
-  COUNT(DISTINCT CASE WHEN bucket IS NULL     THEN eventid END) AS total_without_bucket
+  COUNT(DISTINCT eventid) AS total_requests
 FROM ev
-GROUP BY eventname
-ORDER BY total_all DESC;
+GROUP BY bucket, eventname
+ORDER BY bucket, total_requests DESC;
