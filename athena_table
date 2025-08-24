@@ -19,10 +19,11 @@ WITH ev AS (
     )
 )
 
-SELECT 
+SELECT
   bucket,
   eventname,
   COUNT(DISTINCT eventid) AS total_requests
 FROM ev
 GROUP BY bucket, eventname
 ORDER BY bucket, total_requests DESC;
+
