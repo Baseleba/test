@@ -1,4 +1,5 @@
 SELECT 
+    date_trunc('hour', from_iso8601_timestamp(eventtime)) AS hour,
     eventname,
     COUNT(*) AS total_requests
 FROM ct_logs.cloudtrail_events
@@ -9,5 +10,5 @@ WHERE eventsource = 's3.amazonaws.com'
     OR regexp_extract(arn, 'arn:aws:s3:::([^/]+)', 1) = 'aws-cloudtrail-logs-764973944252-acca46c5'
   )
 CROSS JOIN UNNEST(resources) AS t(arn)
-GROUP BY 1
-ORDER BY total_requests DESC;
+GROUP BY 1,2
+ORDER BY hour, total_requests DESC;
