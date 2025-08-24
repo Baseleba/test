@@ -18,11 +18,10 @@ WITH ev AS (
       OR regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) IS NOT NULL
     )
 )
-
 SELECT
-  bucket,
   eventname,
   COUNT(DISTINCT eventid) AS total_requests
 FROM ev
-GROUP BY bucket, eventname
-ORDER BY bucket, total_requests DESC;
+WHERE bucket = 'aws-cloudtrail-logs-764973944252-acca46c5'  -- << your bucket name here
+GROUP BY eventname
+ORDER BY total_requests DESC;
