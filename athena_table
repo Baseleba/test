@@ -1,23 +1,17 @@
-WITH bucket_events AS (
-  SELECT
-    coalesce(
-      json_extract_scalar(requestparameters, '$.bucketName'),
+WITH ev AS (
+  SELECT DISTINCT
+    c.eventid,
+    COALESCE(
+      json_extract_scalar(c.requestparameters, '$.bucketName'),
       regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1)
     ) AS bucket,
-    eventname
+    c.eventname,
+    c.eventtime
   FROM ct_logs.cloudtrail_events c
-  CROSS JOIN UNNEST(c.resources) AS t(r)
-  WHERE eventsource = 's3.amazonaws.com'
-    AND year = '2025'
-    AND month = '08'
-    AND day = '16'
-    AND DATE(from_iso8601_timestamp(eventtime)) = DATE '2025-08-16'
+  LEFT JOIN UNNEST(c.resources) AS t(r)
+  WHERE c.eventsource = 's3.amazonaws.com'
+    AND c.year  = '2025'
+    AND c.month = '08'
+    AND c.day   = '16'
+    AND DATE(from_iso8601_timestamp(c.eventtime)) = DATE '2025-08-16'
 )
-SELECT
-  bucket,
-  eventname,
-  COUNT(*) AS total_requests
-FROM bucket_events
-WHERE bucket = 'aws-cloudtrail-logs-764973944252-acca46c5'
-GROUP BY bucket, eventname
-ORDER BY total_requests DESC;
