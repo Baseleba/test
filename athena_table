@@ -1,6 +1,9 @@
-COALESCE(
-  try(e.useridentity."userName"),
-  try(e.useridentity."sessionContext"."sessionIssuer"."userName"),
-  regexp_extract(try(e.useridentity.arn), '.*/([^/]+)$', 1),
-  try(e.useridentity."principalId")
-)
+SELECT
+  try(e.useridentity."userName") AS userName,
+  try(e.useridentity."sessionContext"."sessionIssuer"."userName") AS issuerName,
+  try(e.useridentity."principalId") AS principalId,
+  try(e.useridentity.arn) AS arn
+FROM ct_logs.cloudtrail_events e
+WHERE e.eventsource='s3.amazonaws.com'
+  AND e.year='2025' AND e.month='08' AND e.day='16'
+LIMIT 5;
