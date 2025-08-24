@@ -1,26 +1,13 @@
--- Buckets with number of S3 calls on 2025-08-16 (CloudTrail data events)
-WITH from_req AS (
-  SELECT json_extract_scalar(requestparameters, '$.bucketName') AS bucket
-  FROM ct_logs.cloudtrail_events
-  WHERE eventsource = 's3.amazonaws.com'
-    AND year = '2025' AND month = '08' AND day = '16'
-    AND DATE(from_iso8601_timestamp(eventtime)) = DATE '2025-08-16'
-    AND json_extract_scalar(requestparameters, '$.bucketName') IS NOT NULL
-),
-from_res AS (
-  SELECT regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) AS bucket
-  FROM ct_logs.cloudtrail_events c
-  CROSS JOIN UNNEST(c.resources) AS t(r)
-  WHERE c.eventsource = 's3.amazonaws.com'
-    AND c.year = '2025' AND c.month = '08' AND c.day = '16'
-    AND DATE(from_iso8601_timestamp(c.eventtime)) = DATE '2025-08-16'
-    AND r.type IN ('AWS::S3::Bucket', 'AWS::S3::Object')
-)
-SELECT bucket AS bucket_name, COUNT(*) AS total_requests
-FROM (
-  SELECT bucket FROM from_req
-  UNION ALL
-  SELECT bucket FROM from_res
-) x
+SELECT 
+    eventname,
+    COUNT(*) AS total_requests
+FROM ct_logs.cloudtrail_events
+WHERE eventsource = 's3.amazonaws.com'
+  AND year = '2025' AND month = '08' AND day = '16'
+  AND (
+    json_extract_scalar(requestparameters, '$.bucketName') = 'aws-cloudtrail-logs-764973944252-acca46c5'
+    OR regexp_extract(arn, 'arn:aws:s3:::([^/]+)', 1) = 'aws-cloudtrail-logs-764973944252-acca46c5'
+  )
+CROSS JOIN UNNEST(resources) AS t(arn)
 GROUP BY 1
 ORDER BY total_requests DESC;
