@@ -1,17 +1,26 @@
-SELECT 
-    COALESCE(
-        e.userIdentity.userName, 
-        e.userIdentity.sessionContext.sessionIssuer.userName, 
-        e.userIdentity.principalId
-    ) AS username,
-    COUNT(DISTINCT e.requestID) AS total_requests
+-- Requests per identity for one bucket on 2025‑08‑16
+WITH bucket_filter AS (
+  SELECT 'aws-cloudtrail-logs-764973944252-acca46c5' AS bucket
+)
+SELECT
+  COALESCE(
+    e.userIdentity.userName,                                    -- IAM user
+    e.userIdentity.sessionContext.sessionIssuer.userName,       -- role name for STS
+    regexp_extract(e.userIdentity.arn, '.*/([^/]+)$', 1),       -- last path segment of ARN
+    e.userIdentity.principalId                                  -- final fallback
+  ) AS username,
+  COUNT(DISTINCT e.requestID) AS request_count
 FROM ct_logs.cloudtrail_events e
-CROSS JOIN UNNEST(e.resources) AS t(r)
-WHERE e.eventsource = 's3.amazonaws.com'
+LEFT JOIN UNNEST(e.resources) AS t(r) ON TRUE
+CROSS JOIN bucket_filter bf
+WHERE e.eventSource = 's3.amazonaws.com'
   AND e.year = '2025' AND e.month = '08' AND e.day = '16'
   AND (
-    json_extract_scalar(e.requestparameters, '$.bucketName') = 'aws-cloudtrail-logs-764973944252-acca46c5'
-    OR regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) = 'aws-cloudtrail-logs-764973944252-acca46c5'
-  )
+       json_extract_scalar(e.requestParameters, '$.bucketName') = bf.bucket
+       OR (
+            r.type IN ('AWS::S3::Bucket','AWS::S3::Object')
+            AND regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) = bf.bucket
+          )
+      )
 GROUP BY 1
-ORDER BY total_requests DESC;
+ORDER BY request_count DESC;
