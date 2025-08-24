@@ -8,10 +8,16 @@ WITH ev AS (
     c.eventname,
     c.eventtime
   FROM ct_logs.cloudtrail_events c
-  LEFT JOIN UNNEST(c.resources) AS t(r)
+  -- NOTE: the ON TRUE is required
+  LEFT JOIN UNNEST(c.resources) AS t(r) ON TRUE
   WHERE c.eventsource = 's3.amazonaws.com'
     AND c.year  = '2025'
     AND c.month = '08'
     AND c.day   = '16'
     AND DATE(from_iso8601_timestamp(c.eventtime)) = DATE '2025-08-16'
 )
+
+-- total for the bucket (deduped by eventid)
+SELECT COUNT(DISTINCT eventid) AS total_requests
+FROM ev
+WHERE bucket = 'aws-cloudtrail-logs-764973944252-acca46c5';
