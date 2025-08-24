@@ -14,7 +14,9 @@ WITH ev AS (
 )
 SELECT
   eventname,
-  COUNT(DISTINCT eventid) AS total_requests
+  COUNT(DISTINCT eventid) AS total_all,
+  COUNT(DISTINCT CASE WHEN bucket IS NOT NULL THEN eventid END) AS total_with_bucket,
+  COUNT(DISTINCT CASE WHEN bucket IS NULL     THEN eventid END) AS total_without_bucket
 FROM ev
 GROUP BY eventname
-ORDER BY total_requests DESC;
+ORDER BY total_all DESC;
