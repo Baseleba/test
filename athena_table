@@ -1,27 +1,18 @@
+-- Requests per identity for one bucket on 2025‑08‑16
 WITH bucket_filter AS (
   SELECT 'aws-cloudtrail-logs-764973944252-acca46c5' AS bucket
 )
 SELECT
   COALESCE(
-    -- IAM user (two schema variants)
-    try(e.useridentity."userName"),
-    try(e.useridentity.username),
-
-    -- STS assumed role name (two schema variants)
-    try(e.useridentity."sessionContext"."sessionIssuer"."userName"),
-    try(e.useridentity.sessioncontext.sessionissuer.username),
-
-    -- Fall back to last segment of ARN (works for roles and service principals)
-    regexp_extract( try(e.useridentity.arn), '.*/([^/]+)$', 1),
-
-    -- Final fallbacks (two schema variants)
-    try(e.useridentity."principalId"),
-    try(e.useridentity.principalid),
-
-    -- If nothing above, at least show where it came from
-    try(e.invokedby),
-    try(e.sourceipaddress)
-  ) AS username_or_principal,
+    -- IAM user (camelCase)
+    e.useridentity."userName",
+    -- STS assumed-role name (camelCase path)
+    e.useridentity."sessionContext"."sessionIssuer"."userName",
+    -- fallback to last segment of ARN (works for roles & some services)
+    regexp_extract(e.useridentity.arn, '.*/([^/]+)$', 1),
+    -- final fallback
+    e.useridentity."principalId"
+  ) AS username,
   COUNT(DISTINCT e."requestID") AS request_count
 FROM ct_logs.cloudtrail_events e
 LEFT JOIN UNNEST(e.resources) AS t(r) ON TRUE
