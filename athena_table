@@ -1,34 +1,5 @@
--- Requests per identity for one bucket on 2025‑08‑16
-WITH bucket_filter AS (
-  SELECT 'aws-cloudtrail-logs-764973944252-acca46c5' AS bucket
-),
-filtered AS (
-  SELECT e.*
-  FROM ct_logs.cloudtrail_events e
-  LEFT JOIN UNNEST(e.resources) AS t(r) ON TRUE
-  CROSS JOIN bucket_filter bf
-  WHERE e.eventsource = 's3.amazonaws.com'
-    AND e.year = '2025' AND e.month = '08' AND e.day = '16'
-    AND (
-         json_extract_scalar(e.requestparameters, '$.bucketName') = bf.bucket
-         OR (
-              r.type IN ('AWS::S3::Bucket','AWS::S3::Object')
-              AND regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) = bf.bucket
-            )
-        )
-)
-SELECT
-  COALESCE(
-    -- IAM user
-    filtered.useridentity."userName",
-    -- STS assumed role: show role name
-    filtered.useridentity."sessionContext"."sessionIssuer"."userName",
-    -- fallback to last segment of the ARN
-    regexp_extract(filtered.useridentity.arn, '.*/([^/]+)$', 1),
-    -- final fallback
-    filtered.useridentity."principalId"
-  ) AS username,
-  COUNT(DISTINCT filtered."eventID") AS request_count
-FROM filtered
-GROUP BY 1
-ORDER BY request_count DESC;
+SELECT e.useridentity
+FROM ct_logs.cloudtrail_events e
+WHERE e.eventsource='s3.amazonaws.com'
+  AND e.year='2025' AND e.month='08' AND e.day='16'
+LIMIT 5;
