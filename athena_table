@@ -1,7 +1,10 @@
 SELECT 
-    date_trunc('hour', from_iso8601_timestamp(e.eventtime)) AS hour,
-    e.eventname,
-    COUNT(*) AS total_requests
+    COALESCE(
+        e.userIdentity.userName, 
+        e.userIdentity.sessionContext.sessionIssuer.userName, 
+        e.userIdentity.principalId
+    ) AS username,
+    COUNT(DISTINCT e.requestID) AS total_requests
 FROM ct_logs.cloudtrail_events e
 CROSS JOIN UNNEST(e.resources) AS t(r)
 WHERE e.eventsource = 's3.amazonaws.com'
@@ -10,5 +13,5 @@ WHERE e.eventsource = 's3.amazonaws.com'
     json_extract_scalar(e.requestparameters, '$.bucketName') = 'aws-cloudtrail-logs-764973944252-acca46c5'
     OR regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) = 'aws-cloudtrail-logs-764973944252-acca46c5'
   )
-GROUP BY 1, e.eventname
-ORDER BY hour, total_requests DESC;
+GROUP BY 1
+ORDER BY total_requests DESC;
