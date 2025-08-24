@@ -1,29 +1,21 @@
--- Actor → distinct requestIDs for the bucket on 2025-08-16
-WITH bf AS (
-  SELECT 'aws-cloudtrail-logs-764973944252-acca46c5' AS bucket
-),
-ev AS (
-  SELECT e.*
-  FROM ct_logs.cloudtrail_events e
-  LEFT JOIN UNNEST(e.resources) t(r) ON TRUE
-  WHERE e.eventsource = 's3.amazonaws.com'
-    AND e.year='2025' AND e.month='08' AND e.day='16'
-    AND (
-         json_extract_scalar(e.requestparameters, '$.bucketName') = (SELECT bucket FROM bf)
-      OR ( r.type IN ('AWS::S3::Bucket','AWS::S3::Object')
-           AND regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) = (SELECT bucket FROM bf) )
-    )
+WITH from_req AS (
+  SELECT
+    json_extract_scalar(requestparameters, '$.bucketName') AS bucket,
+    eventname,
+    eventtime
+  FROM ct_logs.cloudtrail_events
+  WHERE eventsource = 's3.amazonaws.com'
+    AND year = '2025' 
+    AND month = '08' 
+    AND day = '16'
+    AND DATE(from_iso8601_timestamp(eventtime)) = DATE '2025-08-16'
+    AND json_extract_scalar(requestparameters, '$.bucketName') IS NOT NULL
 )
 SELECT
-  COALESCE(
-    regexp_extract(ev.useridentity.arn, ':user/([^/]+)$', 1),          -- IAM user
-    regexp_extract(ev.useridentity.arn, ':role/([^/]+)$', 1),          -- IAM role
-    regexp_extract(ev.useridentity.arn, 'assumed-role/([^/]+)/', 1),   -- STS role
-    regexp_extract(ev.useridentity.arn, '.*/([^/]+)$', 1),             -- last segment
-    ev.useridentity.principalid,                                       -- fallback
-    ev.sourceipaddress                                                 -- last resort
-  ) AS actor,
-  COUNT(DISTINCT ev.requestid) AS request_count
-FROM ev
-GROUP BY 1
-ORDER BY request_count DESC;
+  bucket,
+  eventname,
+  COUNT(*) AS total_requests
+FROM from_req
+WHERE bucket = 'aws-cloudtrail-logs-764973944252-acca46c5'
+GROUP BY bucket, eventname
+ORDER BY total_requests DESC;
