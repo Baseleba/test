@@ -1,28 +1,9 @@
--- Requests per identity for one bucket on 2025-08-16
-WITH bucket_filter AS (
-  SELECT 'aws-cloudtrail-logs-764973944252-acca46c5' AS bucket
-)
 SELECT
-  COALESCE(
-    try(e.useridentity."userName"),                                        -- IAM user
-    try(e.useridentity."sessionContext"."sessionIssuer"."userName"),       -- role (assumed)
-    regexp_extract(try(e.useridentity.arn), '.*/([^/]+)$', 1),             -- last ARN segment
-    try(e.useridentity."principalId"),                                     -- fallback
-    try(e.invokedby),
-    try(e.sourceipaddress)
-  ) AS actor,
-  COUNT(DISTINCT e.requestid) AS request_count
-FROM ct_logs.cloudtrail_events e
-LEFT JOIN UNNEST(e.resources) AS t(r) ON TRUE
-CROSS JOIN bucket_filter bf
-WHERE e.eventsource = 's3.amazonaws.com'
-  AND e.year = '2025' AND e.month = '08' AND e.day = '16'
-  AND (
-       json_extract_scalar(e.requestparameters, '$.bucketName') = bf.bucket
-       OR (
-            r.type IN ('AWS::S3::Bucket','AWS::S3::Object')
-            AND regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1) = bf.bucket
-          )
-      )
-GROUP BY 1
-ORDER BY request_count DESC;
+  try(useridentity."userName") AS userName,
+  try(useridentity."sessionContext"."sessionIssuer"."userName") AS issuerUserName,
+  useridentity.arn AS arn,
+  useridentity.principalid AS principalid
+FROM ct_logs.cloudtrail_events
+WHERE eventsource='s3.amazonaws.com'
+  AND year='2025' AND month='08' AND day='16'
+LIMIT 5;
