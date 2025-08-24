@@ -1,3 +1,4 @@
+-- Actor → distinct requestIDs for the bucket on 2025-08-16
 WITH bf AS (
   SELECT 'aws-cloudtrail-logs-764973944252-acca46c5' AS bucket
 ),
@@ -15,17 +16,12 @@ ev AS (
 )
 SELECT
   COALESCE(
-    -- IAM user ARN: arn:aws:iam::123:user/<user>
-    regexp_extract(ev.useridentity.arn, ':user/([^/]+)$', 1),
-    -- IAM role ARN: arn:aws:iam::123:role/<role>
-    regexp_extract(ev.useridentity.arn, ':role/([^/]+)$', 1),
-    -- STS assumed role: arn:aws:sts::123:assumed-role/<role>/<session>
-    regexp_extract(ev.useridentity.arn, 'assumed-role/([^/]+)/', 1),
-    -- generic fallback: last path segment of the ARN
-    regexp_extract(ev.useridentity.arn, '.*/([^/]+)$', 1),
-    ev.useridentity.principalid,
-    ev.invokedby,
-    ev.sourceipaddress
+    regexp_extract(ev.useridentity.arn, ':user/([^/]+)$', 1),          -- IAM user
+    regexp_extract(ev.useridentity.arn, ':role/([^/]+)$', 1),          -- IAM role
+    regexp_extract(ev.useridentity.arn, 'assumed-role/([^/]+)/', 1),   -- STS role
+    regexp_extract(ev.useridentity.arn, '.*/([^/]+)$', 1),             -- last segment
+    ev.useridentity.principalid,                                       -- fallback
+    ev.sourceipaddress                                                 -- last resort
   ) AS actor,
   COUNT(DISTINCT ev.requestid) AS request_count
 FROM ev
