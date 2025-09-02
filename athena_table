@@ -1,73 +1,9 @@
-WITH dates(d) AS (
-    -- <<< put every requested sample date here >>>
-    SELECT DATE '2024-10-14' UNION ALL
-    SELECT DATE '2024-10-30' UNION ALL
-    SELECT DATE '2024-11-06' UNION ALL
-    SELECT DATE '2024-11-18' UNION ALL
-    SELECT DATE '2024-12-02' UNION ALL
-    SELECT DATE '2024-12-17' UNION ALL
-    SELECT DATE '2025-01-02' UNION ALL
-    SELECT DATE '2025-01-15' UNION ALL
-    SELECT DATE '2025-01-19' UNION ALL
-    SELECT DATE '2025-02-03' UNION ALL
-    SELECT DATE '2025-02-24' UNION ALL
-    SELECT DATE '2025-03-10' UNION ALL
-    SELECT DATE '2025-03-20' UNION ALL
-    SELECT DATE '2025-04-03' UNION ALL
-    SELECT DATE '2025-04-14' UNION ALL
-    SELECT DATE '2025-05-05' UNION ALL
-    SELECT DATE '2025-05-08' UNION ALL
-    SELECT DATE '2025-05-26' UNION ALL
-    SELECT DATE '2025-06-01' UNION ALL
-    SELECT DATE '2025-06-18' UNION ALL
-    SELECT DATE '2025-07-09' UNION ALL
-    SELECT DATE '2025-07-21' UNION ALL
-    SELECT DATE '2025-08-03' UNION ALL
-    SELECT DATE '2025-08-13'
-),
-ct AS (
-  SELECT
-    date(from_iso8601_timestamp(eventTime))                          AS event_date,
-    from_iso8601_timestamp(eventTime)                                AS event_ts,
-    awsRegion,
-    eventSource,
-    eventName,
-    userIdentity.arn                                                 AS actor_arn,
-
-    -- EBS
-    json_extract_scalar(requestParameters, '$.volumeId')             AS ebs_volume_id,
-    json_extract_scalar(responseElements, '$.snapshotId')            AS ebs_snapshot_id,
-
-    -- RDS instance snapshots
-    json_extract_scalar(requestParameters, '$.dBInstanceIdentifier') AS rds_instance_id,
-    json_extract_scalar(requestParameters, '$.dBSnapshotIdentifier') AS rds_snapshot_id,
-    json_extract_scalar(responseElements, '$.dBSnapshot.dBSnapshotArn') AS rds_snapshot_arn,
-
-    -- RDS cluster snapshots
-    json_extract_scalar(requestParameters, '$.dBClusterIdentifier')  AS rds_cluster_id,
-    json_extract_scalar(requestParameters, '$.dBClusterSnapshotIdentifier') AS rds_cluster_snapshot_id,
-    json_extract_scalar(responseElements, '$.dBClusterSnapshot.dBClusterSnapshotArn') AS rds_cluster_snapshot_arn
-  FROM ct_logs.cloudtrail_events
-  WHERE eventSource IN ('ec2.amazonaws.com','rds.amazonaws.com')
-    AND eventName IN (
-      -- EBS
-      'CreateSnapshot','CreateSnapshots','DeleteSnapshot','DeleteSnapshots',
-      -- RDS instance
-      'CreateDBSnapshot','DeleteDBSnapshot',
-      -- RDS cluster
-      'CreateDBClusterSnapshot','DeleteDBClusterSnapshot'
-    )
-)
 SELECT
-  c.event_date,
-  c.awsRegion,
-  c.eventSource,
-  c.eventName,
-  COALESCE(c.ebs_snapshot_id, c.rds_snapshot_id, c.rds_cluster_snapshot_id) AS snapshot_id,
-  COALESCE(c.ebs_volume_id,  c.rds_instance_id, c.rds_cluster_id)           AS source_resource,
-  c.actor_arn,
-  c.event_ts
-FROM ct c
-JOIN dates d
-  ON c.event_date = d.d
-ORDER BY c.event_ts;
+  from_iso8601_timestamp(eventTime) AS ts,
+  awsRegion, eventSource, eventName,
+  userIdentity.arn AS actor_arn
+FROM ct_logs.cloudtrail_events
+WHERE eventName LIKE '%Snapshot%'
+  AND eventSource IN ('ec2.amazonaws.com','rds.amazonaws.com')
+ORDER BY ts DESC
+LIMIT 200;
