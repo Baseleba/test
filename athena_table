@@ -1,12 +1,13 @@
-CREATE EXTERNAL TABLE IF NOT EXISTS ct_logs.cloudtrail_ebs_json (
-  eventTime            string,
-  eventSource          string,
-  eventName            string,
-  awsRegion            string,
-  recipientAccountId   string,
-  userIdentity         string,
-  requestParameters    string,
-  responseElements     string
+-- 1) Create a tolerant JSON table over your CloudTrail S3 path
+CREATE TABLE IF NOT EXISTS ct_logs.cloudtrail_ebs_json (
+  eventTime          string,
+  eventSource        string,
+  eventName          string,
+  awsRegion          string,
+  recipientAccountId string,
+  userIdentity       string,
+  requestParameters  string,
+  responseElements   string
 )
 PARTITIONED BY (year string, month string, day string, region string)
 ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
@@ -14,4 +15,8 @@ WITH SERDEPROPERTIES (
   'ignore.malformed.json'='true',
   'dots.in.keys'='true'
 )
-LOCATION 's3://<YOUR-CLOUDTRAIL-BUCKET>/AWSLogs/<ACCOUNT-ID>/CloudTrail/';
+LOCATION 's3://<YOUR-CLOUDTRAIL-BUCKET>/AWSLogs/<ACCOUNT-ID>/CloudTrail/'
+TBLPROPERTIES (
+  'external.table.purge'='false',
+  'EXTERNAL'='TRUE'
+);
