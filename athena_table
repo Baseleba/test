@@ -1,9 +1,17 @@
-SELECT
-  from_iso8601_timestamp(eventTime) AS ts,
-  awsRegion, eventSource, eventName,
-  userIdentity.arn AS actor_arn
-FROM ct_logs.cloudtrail_events
-WHERE eventName LIKE '%Snapshot%'
-  AND eventSource IN ('ec2.amazonaws.com','rds.amazonaws.com')
-ORDER BY ts DESC
-LIMIT 200;
+CREATE EXTERNAL TABLE IF NOT EXISTS ct_logs.cloudtrail_ebs_json (
+  eventTime            string,
+  eventSource          string,
+  eventName            string,
+  awsRegion            string,
+  recipientAccountId   string,
+  userIdentity         string,
+  requestParameters    string,
+  responseElements     string
+)
+PARTITIONED BY (year string, month string, day string, region string)
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+WITH SERDEPROPERTIES (
+  'ignore.malformed.json'='true',
+  'dots.in.keys'='true'
+)
+LOCATION 's3://<YOUR-CLOUDTRAIL-BUCKET>/AWSLogs/<ACCOUNT-ID>/CloudTrail/';
