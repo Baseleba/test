@@ -1,28 +1,8 @@
-WITH ev AS (
-  SELECT DISTINCT
-    c.eventid,
-    c.eventname,
-    -- resolve bucket from requestParameters or resources[].arn
-    COALESCE(
-      json_extract_scalar(c.requestparameters, '$.bucketName'),
-      regexp_extract(r.arn, 'arn:aws:s3:::([^/]+)', 1)
-    ) AS bucket,
-    -- resolve principal from userIdentity or from the session issuer if assumed role
-    COALESCE(
-      c.useridentity.arn,
-      c.useridentity.sessioncontext.sessionissuer.arn
-    ) AS principal
-  FROM ct_logs.cloudtrail_events c
-  LEFT JOIN UNNEST(c.resources) AS t(r) ON TRUE
-  WHERE c.eventsource = 's3.amazonaws.com'
-    AND c.year='2025' AND c.month='08' AND c.day='16'
-    AND DATE(from_iso8601_timestamp(c.eventtime)) = DATE '2025-08-16'
-)
-SELECT
-  eventname,
-  COALESCE(principal, '<unknown>') AS principal,
-  COUNT(DISTINCT eventid)          AS total_requests
-FROM ev
-WHERE bucket = 'aws-cloudtrail-logs-764973944252-acca46c5'   -- <- your bucket
-GROUP BY eventname, principal
-ORDER BY eventname, total_requests DESC;
+SELECT event_date, awsRegion, eventSource, eventName,
+       COALESCE(ebs_snapshot_id, rds_snapshot_id, rds_cluster_snapshot_id) AS snapshot_id,
+       COALESCE(ebs_volume_id, rds_instance_id, rds_cluster_id)            AS source_resource,
+       actor_arn, event_ts
+FROM ( /* same CTEs as above */ ct )
+JOIN dates d ON ct.event_date = d.d
+WHERE eventName IN ('CreateSnapshot','CreateSnapshots','CreateDBSnapshot','CreateDBClusterSnapshot')
+ORDER BY event_ts;
