@@ -6,3 +6,4 @@ WHERE eventSource = 'ec2.amazonaws.com'
   AND eventName LIKE '%Snapshot%'
 ORDER BY ts DESC
 LIMIT 100;
+https://codeshare.io/5DrLXZ
